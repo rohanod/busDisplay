@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import os, sys, logging, datetime, time, json, requests, pygame, io, cairosvg
 
 # ────────── Logging ──────────
