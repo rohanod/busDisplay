@@ -210,7 +210,7 @@ def main():
             })
         elif choice == "Sizing":
             config = manage_settings(config, "Sizing", {
-                "cell_w": DEFAULTS["cell_w"], "bar_h": DEFAULTS["bar_h"], "number_size": DEFAULTS["number_size"],
+                "cell_w": DEFAULTS["cell_w"], "bar_h": DEFAULTS["bar_h"], "minute_size": 48,
                 "now_size": DEFAULTS["now_size"], "stop_name_size": DEFAULTS["stop_name_size"],
                 "line_size": DEFAULTS["line_size"], "icon_size": DEFAULTS["icon_size"],
                 "grid_shrink": 0.8

@@ -30,14 +30,14 @@ DEFAULT_BAR_H              = 320
 DEFAULT_BAR_MARGIN         = 30
 DEFAULT_BAR_PADDING        = 25
 DEFAULT_CARD_PADDING       = 15
-DEFAULT_NUMBER_SIZE        = 48
+DEFAULT_MINUTE_SIZE        = 48
 DEFAULT_NOW_SIZE           = 30
 DEFAULT_STOP_NAME_SIZE     = 48
-DEFAULT_LINE_SIZE          = 36
+DEFAULT_LINE_SIZE          = 40
 DEFAULT_ICON_SIZE          = 40
 DEFAULT_BORDER_RADIUS      = 16
 DEFAULT_SHADOW_OFFSET      = 6
-DEFAULT_GRID_SHRINK        = 0.8
+DEFAULT_GRID_SHRINK        = 0.7
 
 # ────────── Runtime Config ──────────
 CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
@@ -63,7 +63,7 @@ BAR_H_BASE = config.get("bar_h", DEFAULT_BAR_H)
 BAR_MARGIN_BASE = config.get("bar_margin", DEFAULT_BAR_MARGIN)
 BAR_PADDING_BASE = config.get("bar_padding", DEFAULT_BAR_PADDING)
 CARD_PADDING_BASE = config.get("card_padding", DEFAULT_CARD_PADDING)
-NUMBER_SIZE_BASE = config.get("number_size", DEFAULT_NUMBER_SIZE)
+MINUTE_SIZE_BASE = config.get("minute_size", DEFAULT_MINUTE_SIZE)
 NOW_SIZE_BASE = config.get("now_size", DEFAULT_NOW_SIZE)
 STOP_NAME_SIZE_BASE = config.get("stop_name_size", DEFAULT_STOP_NAME_SIZE)
 LINE_SIZE_BASE = config.get("line_size", DEFAULT_LINE_SIZE)
@@ -172,7 +172,7 @@ def draw_shadow(surf, rect, offset, color, border_radius):
     surf.blit(shadow_surf, (shadow_rect[0], shadow_rect[1]))
 
 # ────────── Drawing ──────────
-def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_num, font_now, font_line):
+def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line):
     if not deps:
         return
     
@@ -230,7 +230,7 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
         # Minutes
         if mn > 0:
             min_text = str(mn)
-            min_surf = font_num.render(min_text, True, text_color)
+            min_surf = font_minute.render(min_text, True, text_color)
         else:
             min_text = "NOW"
             min_surf = font_now.render(min_text, True, text_color)
@@ -310,7 +310,7 @@ def main():
     BAR_MARGIN    = int(BAR_MARGIN_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     BAR_PADDING   = int(BAR_PADDING_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     CARD_PADDING  = int(CARD_PADDING_BASE * SCALE_MULTIPLIER * scale * grid_scale)
-    NUMBER_SIZE   = int(NUMBER_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    MINUTE_SIZE   = int(MINUTE_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     NOW_SIZE      = int(NOW_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     STOP_NAME_SIZE= int(STOP_NAME_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     LINE_SIZE     = int(LINE_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
@@ -319,7 +319,7 @@ def main():
     SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     
     # Initialize fonts and images after scaling is calculated
-    font_num  = pygame.font.SysFont("DejaVuSans", NUMBER_SIZE, bold=True)
+    font_minute = pygame.font.SysFont("DejaVuSans", MINUTE_SIZE, bold=True)
     font_now  = pygame.font.SysFont("DejaVuSans", NOW_SIZE, bold=True)
     font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
     font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
@@ -366,7 +366,7 @@ def main():
 
             if loading:
                 msg  = f"Loading {SPINNER[frame]}"
-                surf = font_num.render(msg, True, ACCENT_COLOR)
+                surf = font_minute.render(msg, True, ACCENT_COLOR)
                 screen.blit(surf, ((info.current_w - surf.get_width())//2,
                                    (info.current_h - surf.get_height())//2))
             else:
@@ -378,17 +378,18 @@ def main():
                 
                 positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
                 for idx, (x, y) in enumerate(positions[:rows]):
-                    draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_num, font_now, font_line)
+                    draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
 
             pygame.display.flip()
 
-        # fetch one stop per frame during loading, respect interval after
-        current_time = time.time()
-        for i, stop in enumerate(STOPS):
-            if current_time >= next_poll[i]:
-                next_poll[i] = current_time + POLL_INTERVAL
-                results[i] = fetch(stop)
-                break
+        # fetch every minute
+        if loading or current_minute != last_minute:
+            current_time = time.time()
+            for i, stop in enumerate(STOPS):
+                if current_time >= next_poll[i]:
+                    next_poll[i] = current_time + POLL_INTERVAL
+                    results[i] = fetch(stop)
+                    break
 
         for e in pygame.event.get():
             if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:

@@ -72,7 +72,7 @@ If you prefer to edit the file by hand, create `~/.config/busdisplay/config.json
 | `bar_margin` | Margin between stop cards | `30` | `20` |
 | `bar_padding` | Padding inside stop cards | `25` | `20` |
 | `card_padding` | Padding between elements | `15` | `10` |
-| `number_size` | Departure time font size | `48` | `42` |
+| `minute_size` | Departure time font size | `48` | `42` |
 | `now_size` | "NOW" text font size | `28` | `24` |
 | `stop_name_size` | Stop name font size | `48` | `44` |
 | `line_size` | Line number font size | `36` | `32` |
