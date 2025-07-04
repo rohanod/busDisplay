@@ -28,7 +28,7 @@ To launch the tool, run:
 ```bash
 cd ~/busdisplay
 source venv/bin/activate
-python config_generator.py
+python configurator.py
 ```
 
 ### Manual Configuration
