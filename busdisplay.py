@@ -95,23 +95,7 @@ ACCENT_COLOR   = ORANGE
 
 # Pygame will be initialized in main() after X11 is ready
 
-# ────────── Scaling ──────────
-design_w = COLS * CELL_W_BASE * SCALE_MULTIPLIER
-design_h = ROWS * BAR_H_BASE * SCALE_MULTIPLIER + (ROWS - 1) * BAR_MARGIN_BASE * SCALE_MULTIPLIER
-scale    = min(info.current_w / design_w, info.current_h / design_h)
-
-CELL_W        = int(CELL_W_BASE * SCALE_MULTIPLIER * scale)
-BAR_H         = int(BAR_H_BASE * SCALE_MULTIPLIER * scale)
-BAR_MARGIN    = int(BAR_MARGIN_BASE * SCALE_MULTIPLIER * scale)
-BAR_PADDING   = int(BAR_PADDING_BASE * SCALE_MULTIPLIER * scale)
-CARD_PADDING  = int(CARD_PADDING_BASE * SCALE_MULTIPLIER * scale)
-NUMBER_SIZE   = int(NUMBER_SIZE_BASE * SCALE_MULTIPLIER * scale)
-NOW_SIZE      = int(NOW_SIZE_BASE * SCALE_MULTIPLIER * scale)
-STOP_NAME_SIZE= int(STOP_NAME_SIZE_BASE * SCALE_MULTIPLIER * scale)
-LINE_SIZE     = int(LINE_SIZE_BASE * SCALE_MULTIPLIER * scale)
-ICON_SIZE     = int(ICON_SIZE_BASE * SCALE_MULTIPLIER * scale)
-BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale)
-SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale)
+# Scaling will be done in main() after pygame is initialized
 
 # Fonts and images will be initialized in main()
 
@@ -310,7 +294,25 @@ def main():
     screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.NOFRAME)
     pygame.mouse.set_visible(False)
     
-    # Initialize fonts and images after pygame is ready
+    # ────────── Scaling ──────────
+    design_w = COLS * CELL_W_BASE * SCALE_MULTIPLIER
+    design_h = ROWS * BAR_H_BASE * SCALE_MULTIPLIER + (ROWS - 1) * BAR_MARGIN_BASE * SCALE_MULTIPLIER
+    scale    = min(info.current_w / design_w, info.current_h / design_h)
+    
+    CELL_W        = int(CELL_W_BASE * SCALE_MULTIPLIER * scale)
+    BAR_H         = int(BAR_H_BASE * SCALE_MULTIPLIER * scale)
+    BAR_MARGIN    = int(BAR_MARGIN_BASE * SCALE_MULTIPLIER * scale)
+    BAR_PADDING   = int(BAR_PADDING_BASE * SCALE_MULTIPLIER * scale)
+    CARD_PADDING  = int(CARD_PADDING_BASE * SCALE_MULTIPLIER * scale)
+    NUMBER_SIZE   = int(NUMBER_SIZE_BASE * SCALE_MULTIPLIER * scale)
+    NOW_SIZE      = int(NOW_SIZE_BASE * SCALE_MULTIPLIER * scale)
+    STOP_NAME_SIZE= int(STOP_NAME_SIZE_BASE * SCALE_MULTIPLIER * scale)
+    LINE_SIZE     = int(LINE_SIZE_BASE * SCALE_MULTIPLIER * scale)
+    ICON_SIZE     = int(ICON_SIZE_BASE * SCALE_MULTIPLIER * scale)
+    BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale)
+    SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale)
+    
+    # Initialize fonts and images after scaling is calculated
     font_num  = pygame.font.SysFont("DejaVuSans", NUMBER_SIZE, bold=True)
     font_now  = pygame.font.SysFont("DejaVuSans", NOW_SIZE, bold=True)
     font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
