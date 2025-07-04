@@ -30,7 +30,7 @@ Create `~/.config/busdisplay/config.json` to configure your display:
     {"ID": "8587061"}
   ],
   "max_departures": 8,
-  "api_request_interval": 60,
+  "api_request_interval": 90,
   "max_minutes": 120,
   "show_clock": true
 }
@@ -48,7 +48,7 @@ Create `~/.config/busdisplay/config.json` to configure your display:
 |--------|-------------|---------|----------|
 | `stops` | Array of stop configurations | `[]` | `[{"ID": "8592791"}]` |
 | `max_departures` | Maximum departures per stop | `8` | `6` |
-| `api_request_interval` | Seconds between API calls | `60` | `45` |
+| `api_request_interval` | Seconds between API calls | `90` | `60` |
 | `max_minutes` | Hide departures beyond X minutes | `120` | `90` |
 | `show_clock` | Show current time in corner | `true` | `false` |
 | `cols` | Maximum departure columns | `8` | `6` |

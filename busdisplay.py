@@ -70,7 +70,7 @@ SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
 MAX_SHOW       = config.get("max_departures", 8)
-POLL_INTERVAL  = config.get("api_request_interval", 60)
+POLL_INTERVAL  = config.get("api_request_interval", 90)
 MAX_MINUTES    = config.get("max_minutes", 120)
 SHOW_CLOCK     = config.get("show_clock", True)
 API_URL        = "https://search.ch/timetable/api/stationboard.fr.json"
@@ -309,41 +309,49 @@ def get_layout_positions(num_stops):
 
 # ────────── Main loop ──────────
 def main():
-    clk = pygame.time.Clock()
+    last_minute = -1
     while True:
-        frame = (pygame.time.get_ticks()//250) % len(SPINNER)
-        screen.fill(DARK_BG)
-
-        if any(r is None for r in results):
-            msg  = f"Loading {SPINNER[frame]}"
-            surf = font_num.render(msg, True, ACCENT_COLOR)
-            screen.blit(surf, ((info.current_w - surf.get_width())//2,
-                               (info.current_h - surf.get_height())//2))
-        else:
-            # Show clock if enabled
-            if SHOW_CLOCK:
-                current_time = datetime.datetime.now().strftime("%H:%M")
-                clock_surf = font_clock.render(current_time, True, TEXT_SECONDARY)
-                screen.blit(clock_surf, (20, 20))
+        now = datetime.datetime.now()
+        current_minute = now.minute
+        
+        # Only update on new minute (aligned to clock) or first run
+        if current_minute != last_minute or last_minute == -1:
+            last_minute = current_minute
             
-            positions = get_layout_positions(rows)
-            for idx, (x, y) in enumerate(positions[:rows]):
-                draw_bar_at_pos(x, y, *results[idx])
+            frame = current_minute % len(SPINNER)
+            screen.fill(DARK_BG)
 
-        pygame.display.flip()
+            if any(r is None for r in results):
+                msg  = f"Loading {SPINNER[frame]}"
+                surf = font_num.render(msg, True, ACCENT_COLOR)
+                screen.blit(surf, ((info.current_w - surf.get_width())//2,
+                                   (info.current_h - surf.get_height())//2))
+            else:
+                # Show clock if enabled
+                if SHOW_CLOCK:
+                    current_time = now.strftime("%H:%M")
+                    clock_surf = font_clock.render(current_time, True, TEXT_SECONDARY)
+                    screen.blit(clock_surf, (20, 20))
+                
+                positions = get_layout_positions(rows)
+                for idx, (x, y) in enumerate(positions[:rows]):
+                    draw_bar_at_pos(x, y, *results[idx])
 
-        # fetch one stop per frame
-        for i, stop in enumerate(STOPS):
-            if time.time() >= next_poll[i]:
-                next_poll[i] = time.time() + POLL_INTERVAL
-                results[i]   = fetch(stop)
-                break
+            pygame.display.flip()
+
+            # fetch one stop per frame
+            current_time = time.time()
+            for i, stop in enumerate(STOPS):
+                if current_time >= next_poll[i]:
+                    next_poll[i] = current_time + POLL_INTERVAL
+                    results[i] = fetch(stop)
+                    break
 
         for e in pygame.event.get():
             if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                 pygame.quit(); sys.exit(0)
 
-        clk.tick(30)
+        time.sleep(1)  # Check every second for minute changes
 
 if __name__ == "__main__":
     try:
