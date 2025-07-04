@@ -93,23 +93,7 @@ TEXT_PRIMARY   = (255, 255, 255)
 TEXT_SECONDARY = (174, 174, 178)
 ACCENT_COLOR   = ORANGE
 
-# ────────── Pygame init ──────────
-log.info(f"DISPLAY environment: {os.environ.get('DISPLAY', 'Not set')}")
-if "DISPLAY" not in os.environ:
-    log.info("No DISPLAY found, using fbcon")
-    os.environ["SDL_VIDEODRIVER"] = "fbcon"
-    os.environ["SDL_AUDIODRIVER"] = "dummy"
-else:
-    log.info("DISPLAY found, using X11")
-
-log.info("Initializing pygame")
-pygame.init()
-log.info("Initializing pygame display")
-pygame.display.init()
-log.info("Pygame initialized successfully")
-info = pygame.display.Info()
-screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.NOFRAME)
-pygame.mouse.set_visible(False)
+# Pygame will be initialized in main() after X11 is ready
 
 # ────────── Scaling ──────────
 design_w = COLS * CELL_W_BASE * SCALE_MULTIPLIER
@@ -129,26 +113,14 @@ ICON_SIZE     = int(ICON_SIZE_BASE * SCALE_MULTIPLIER * scale)
 BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale)
 SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale)
 
-font_num  = pygame.font.SysFont("DejaVuSans", NUMBER_SIZE, bold=True)
-font_now  = pygame.font.SysFont("DejaVuSans", NOW_SIZE, bold=True)
-font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
-font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
-font_clock = pygame.font.SysFont("DejaVuSans", int(STOP_NAME_SIZE * 0.8), bold=True)
+# Fonts and images will be initialized in main()
 
-# Fixed card dimensions
-FIXED_CARD_W = int(800 * SCALE_MULTIPLIER * scale)
-FIXED_CELL_W = int(100 * SCALE_MULTIPLIER * scale)
-icon_w = icon_h = ICON_SIZE
-
-def _load_svg(path: str) -> pygame.Surface:
+def _load_svg(path: str, w: int, h: int) -> pygame.Surface:
     with open(path, "r") as f:
         svg = f.read()
     png = cairosvg.svg2png(bytestring=svg.encode(),
-                           output_width=icon_w, output_height=icon_h)
+                           output_width=w, output_height=h)
     return pygame.image.load(io.BytesIO(png)).convert_alpha()
-
-clock_img = _load_svg(CLOCK_SVG_FILE)
-tram_img  = _load_svg(TRAM_SVG_FILE)
 
 rows       = len(STOPS)
 results    = [None] * rows
@@ -318,6 +290,41 @@ def get_layout_positions(num_stops):
 
 # ────────── Main loop ──────────
 def main():
+    global screen, info, font_num, font_now, font_stop, font_line, font_clock, clock_img, tram_img
+    
+    # ────────── Pygame init ──────────
+    log.info(f"DISPLAY environment: {os.environ.get('DISPLAY', 'Not set')}")
+    if "DISPLAY" not in os.environ:
+        log.info("No DISPLAY found, using fbcon")
+        os.environ["SDL_VIDEODRIVER"] = "fbcon"
+        os.environ["SDL_AUDIODRIVER"] = "dummy"
+    else:
+        log.info("DISPLAY found, using X11")
+    
+    log.info("Initializing pygame")
+    pygame.init()
+    log.info("Initializing pygame display")
+    pygame.display.init()
+    log.info("Pygame initialized successfully")
+    info = pygame.display.Info()
+    screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.NOFRAME)
+    pygame.mouse.set_visible(False)
+    
+    # Initialize fonts and images after pygame is ready
+    font_num  = pygame.font.SysFont("DejaVuSans", NUMBER_SIZE, bold=True)
+    font_now  = pygame.font.SysFont("DejaVuSans", NOW_SIZE, bold=True)
+    font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
+    font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
+    font_clock = pygame.font.SysFont("DejaVuSans", int(STOP_NAME_SIZE * 0.8), bold=True)
+    
+    # Fixed card dimensions
+    global FIXED_CARD_W, FIXED_CELL_W
+    FIXED_CARD_W = int(800 * SCALE_MULTIPLIER * scale)
+    FIXED_CELL_W = int(100 * SCALE_MULTIPLIER * scale)
+    
+    clock_img = _load_svg(CLOCK_SVG_FILE, ICON_SIZE, ICON_SIZE)
+    tram_img  = _load_svg(TRAM_SVG_FILE, ICON_SIZE, ICON_SIZE)
+    
     last_minute = -1
     while True:
         now = datetime.datetime.now()
