@@ -1,3 +1,5 @@
 #!/bin/bash
-git -C "${HOME}/busdisplay" pull --rebase --quiet || true
+cd "${HOME}/busdisplay"
+git fetch --quiet
+git reset --hard origin/main --quiet
 exit 0

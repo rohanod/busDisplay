@@ -30,7 +30,7 @@ DEFAULT_BAR_MARGIN         = 30
 DEFAULT_BAR_PADDING        = 25
 DEFAULT_CARD_PADDING       = 15
 DEFAULT_NUMBER_SIZE        = 48
-DEFAULT_NOW_SIZE           = 20
+DEFAULT_NOW_SIZE           = 15
 DEFAULT_STOP_NAME_SIZE     = 48
 DEFAULT_LINE_SIZE          = 36
 DEFAULT_ICON_SIZE          = 40
@@ -82,6 +82,7 @@ if os.path.isfile(CONFIG_PATH):
 MAX_SHOW       = config_overrides.get("max_departures", 8)
 POLL_INTERVAL  = config_overrides.get("api_request_interval", 60)
 MAX_MINUTES    = config_overrides.get("max_minutes", 120)
+SHOW_CLOCK     = config_overrides.get("show_clock", True)
 API_URL        = "https://search.ch/timetable/api/stationboard.fr.json"
 API_LIMIT      = 100
 FETCH_TIMEOUT  = 4
@@ -133,6 +134,11 @@ font_num  = pygame.font.SysFont("DejaVuSans", NUMBER_SIZE, bold=True)
 font_now  = pygame.font.SysFont("DejaVuSans", NOW_SIZE, bold=True)
 font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
 font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
+font_clock = pygame.font.SysFont("DejaVuSans", int(STOP_NAME_SIZE * 0.8), bold=True)
+
+# Fixed card dimensions
+FIXED_CARD_W = int(140 * SCALE_MULTIPLIER * scale)
+FIXED_CELL_W = int(120 * SCALE_MULTIPLIER * scale)
 icon_w = icon_h = ICON_SIZE
 
 def _load_svg(path: str) -> pygame.Surface:
@@ -208,13 +214,13 @@ def draw_shadow(surf, rect, offset, color):
     surf.blit(shadow_surf, (shadow_rect[0], shadow_rect[1]))
 
 # ────────── Drawing ──────────
-def draw_bar(y, name, deps):
+def draw_bar_at_pos(x, y, name, deps):
     if not deps:
         return
     
     cols = min(len(deps), COLS - 1)
-    total_w = cols * CELL_W + BAR_PADDING * 2
-    x0 = (info.current_w - total_w) // 2
+    total_w = FIXED_CARD_W
+    x0 = x
     
     # Draw shadow
     card_rect = (x0, y, total_w, BAR_H)
@@ -241,7 +247,7 @@ def draw_bar(y, name, deps):
     
     # Departure cards
     card_start_x = icon_x + ICON_SIZE + CARD_PADDING
-    card_w = (total_w - card_start_x - BAR_PADDING) // cols
+    card_w = FIXED_CELL_W
     
     for i, (_, ln, mn) in enumerate(deps[:cols]):
         card_x = card_start_x + i * card_w
@@ -277,6 +283,37 @@ def draw_bar(y, name, deps):
         line_y = content_y + (3 * content_h // 4) - (line_surf.get_height() // 2)
         screen.blit(line_surf, (line_x, line_y))
 
+def get_layout_positions(num_stops):
+    positions = []
+    if num_stops <= 2:
+        # Vertical stack
+        total_h = num_stops * BAR_H + (num_stops - 1) * BAR_MARGIN
+        start_y = (info.current_h - total_h) // 2
+        for i in range(num_stops):
+            x = (info.current_w - FIXED_CARD_W) // 2
+            y = start_y + i * (BAR_H + BAR_MARGIN)
+            positions.append((x, y))
+    elif num_stops == 3:
+        # Two on top, one centered below
+        top_y = (info.current_h - (2 * BAR_H + BAR_MARGIN)) // 2
+        # Top two
+        positions.append(((info.current_w - 2 * FIXED_CARD_W - BAR_MARGIN) // 2, top_y))
+        positions.append(((info.current_w - 2 * FIXED_CARD_W - BAR_MARGIN) // 2 + FIXED_CARD_W + BAR_MARGIN, top_y))
+        # Bottom center
+        positions.append(((info.current_w - FIXED_CARD_W) // 2, top_y + BAR_H + BAR_MARGIN))
+    else:
+        # 2x2 grid
+        grid_w = 2 * FIXED_CARD_W + BAR_MARGIN
+        grid_h = 2 * BAR_H + BAR_MARGIN
+        start_x = (info.current_w - grid_w) // 2
+        start_y = (info.current_h - grid_h) // 2
+        for i in range(min(4, num_stops)):
+            row, col = i // 2, i % 2
+            x = start_x + col * (FIXED_CARD_W + BAR_MARGIN)
+            y = start_y + row * (BAR_H + BAR_MARGIN)
+            positions.append((x, y))
+    return positions
+
 # ────────── Main loop ──────────
 def main():
     clk = pygame.time.Clock()
@@ -290,9 +327,15 @@ def main():
             screen.blit(surf, ((info.current_w - surf.get_width())//2,
                                (info.current_h - surf.get_height())//2))
         else:
-            y0 = (info.current_h - (rows*BAR_H + (rows-1)*BAR_MARGIN))//2
-            for idx, _ in enumerate(STOPS):
-                draw_bar(y0 + idx*(BAR_H+BAR_MARGIN), *results[idx])
+            # Show clock if enabled
+            if SHOW_CLOCK:
+                current_time = datetime.datetime.now().strftime("%H:%M")
+                clock_surf = font_clock.render(current_time, True, TEXT_SECONDARY)
+                screen.blit(clock_surf, (20, 20))
+            
+            positions = get_layout_positions(rows)
+            for idx, (x, y) in enumerate(positions[:rows]):
+                draw_bar_at_pos(x, y, *results[idx])
 
         pygame.display.flip()
 
