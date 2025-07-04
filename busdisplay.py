@@ -327,19 +327,38 @@ def main():
     clock_img = _load_svg(CLOCK_SVG_FILE, ICON_SIZE, ICON_SIZE)
     tram_img  = _load_svg(TRAM_SVG_FILE, ICON_SIZE, ICON_SIZE)
     
+    frame_count = 0
     last_minute = -1
+    loading = True
+    
     while True:
         now = datetime.datetime.now()
         current_minute = now.minute
         
-        # Only update on new minute (aligned to clock) or first run
-        if current_minute != last_minute or last_minute == -1:
-            last_minute = current_minute
-            
-            frame = current_minute % len(SPINNER)
+        # Check if still loading
+        loading = any(r is None for r in results)
+        
+        # Update logic: 1fps during loading, 1fpm after loading
+        should_update = False
+        if loading:
+            # 1fps during loading
+            should_update = True
+            frame_count += 1
+        else:
+            # 1 frame per minute after loading
+            if current_minute != last_minute:
+                last_minute = current_minute
+                should_update = True
+        
+        if should_update:
+            if loading:
+                frame = (frame_count // 30) % len(SPINNER)  # Change spinner every 30 frames
+            else:
+                frame = current_minute % len(SPINNER)
+                
             screen.fill(DARK_BG)
 
-            if any(r is None for r in results):
+            if loading:
                 msg  = f"Loading {SPINNER[frame]}"
                 surf = font_num.render(msg, True, ACCENT_COLOR)
                 screen.blit(surf, ((info.current_w - surf.get_width())//2,
@@ -357,19 +376,23 @@ def main():
 
             pygame.display.flip()
 
-            # fetch one stop per frame
-            current_time = time.time()
-            for i, stop in enumerate(STOPS):
-                if current_time >= next_poll[i]:
-                    next_poll[i] = current_time + POLL_INTERVAL
-                    results[i] = fetch(stop)
-                    break
+        # fetch one stop per frame during loading, respect interval after
+        current_time = time.time()
+        for i, stop in enumerate(STOPS):
+            if current_time >= next_poll[i]:
+                next_poll[i] = current_time + POLL_INTERVAL
+                results[i] = fetch(stop)
+                break
 
         for e in pygame.event.get():
             if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                 pygame.quit(); sys.exit(0)
 
-        time.sleep(1)  # Check every second for minute changes
+        # Sleep based on loading state
+        if loading:
+            time.sleep(1)  # 1fps during loading
+        else:
+            time.sleep(1)  # Check every second for minute changes
 
 if __name__ == "__main__":
     try:
