@@ -162,10 +162,10 @@ def fetch(stop):
 def draw_rounded_rect(surf, color, rect, radius):
     pygame.draw.rect(surf, color, rect, border_radius=radius)
 
-def draw_shadow(surf, rect, offset, color):
+def draw_shadow(surf, rect, offset, color, border_radius):
     shadow_rect = (rect[0] + offset, rect[1] + offset, rect[2], rect[3])
     shadow_surf = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
-    pygame.draw.rect(shadow_surf, color, (0, 0, rect[2], rect[3]), border_radius=BORDER_RADIUS)
+    pygame.draw.rect(shadow_surf, color, (0, 0, rect[2], rect[3]), border_radius=border_radius)
     surf.blit(shadow_surf, (shadow_rect[0], shadow_rect[1]))
 
 # ────────── Drawing ──────────
@@ -183,7 +183,7 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
     
     # Draw shadow
     card_rect = (x0, y, total_w, BAR_H)
-    draw_shadow(screen, card_rect, SHADOW_OFFSET, CARD_SHADOW)
+    draw_shadow(screen, card_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
     
     # Draw main card
     draw_rounded_rect(screen, CARD_BG, card_rect, BORDER_RADIUS)
