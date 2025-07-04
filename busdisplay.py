@@ -21,6 +21,7 @@ sys.excepthook = _excepthook
 log = logging.getLogger("busDisplay")
 
 # ────────── Initial Defaults (pre-scaling) ──────────
+DEFAULT_SCALE_MULTIPLIER   = 1.0
 DEFAULT_COLS               = 8
 DEFAULT_ROWS               = 2
 DEFAULT_CELL_W             = 140
@@ -28,7 +29,8 @@ DEFAULT_BAR_H              = 320
 DEFAULT_BAR_MARGIN         = 30
 DEFAULT_BAR_PADDING        = 25
 DEFAULT_CARD_PADDING       = 15
-DEFAULT_NUMBER_SIZE        = 64
+DEFAULT_NUMBER_SIZE        = 48
+DEFAULT_NOW_SIZE           = 20
 DEFAULT_STOP_NAME_SIZE     = 48
 DEFAULT_LINE_SIZE          = 36
 DEFAULT_ICON_SIZE          = 40
@@ -37,22 +39,49 @@ DEFAULT_SHADOW_OFFSET      = 6
 
 # ────────── Runtime Config ──────────
 CFG_PATH = os.path.expanduser("~/.config/busdisplay/stops.json")
+SIZE_CFG_PATH = os.path.expanduser("~/.config/busdisplay/sizes.json")
+
 if not os.path.isfile(CFG_PATH):
-    os.makedirs(os.path.dirname(CFG_PATH), exist_ok=True)
-    with open(CFG_PATH, "w") as f:  # write minimal example
-        json.dump(
-            [
-                {"ID": "8592791", "Lines": {"10": "8587061"}},
-                {"ID": "8592855", "Lines": {"22": "8592843"}},
-            ],
-            f,
-            indent=2,
-        )
+    log.error(f"Config file not found: {CFG_PATH}")
+    log.error("Please create stops.json with your stop configuration")
+    sys.exit(1)
+
 with open(CFG_PATH) as f:
     STOPS = json.load(f)
 
-MAX_SHOW       = 10
-POLL_INTERVAL  = 60
+# Load size overrides
+size_overrides = {}
+if os.path.isfile(SIZE_CFG_PATH):
+    with open(SIZE_CFG_PATH) as f:
+        size_overrides = json.load(f)
+
+# Apply size overrides
+SCALE_MULTIPLIER = size_overrides.get("scale_multiplier", DEFAULT_SCALE_MULTIPLIER)
+COLS = size_overrides.get("cols", DEFAULT_COLS)
+ROWS = size_overrides.get("rows", DEFAULT_ROWS)
+CELL_W_BASE = size_overrides.get("cell_w", DEFAULT_CELL_W)
+BAR_H_BASE = size_overrides.get("bar_h", DEFAULT_BAR_H)
+BAR_MARGIN_BASE = size_overrides.get("bar_margin", DEFAULT_BAR_MARGIN)
+BAR_PADDING_BASE = size_overrides.get("bar_padding", DEFAULT_BAR_PADDING)
+CARD_PADDING_BASE = size_overrides.get("card_padding", DEFAULT_CARD_PADDING)
+NUMBER_SIZE_BASE = size_overrides.get("number_size", DEFAULT_NUMBER_SIZE)
+NOW_SIZE_BASE = size_overrides.get("now_size", DEFAULT_NOW_SIZE)
+STOP_NAME_SIZE_BASE = size_overrides.get("stop_name_size", DEFAULT_STOP_NAME_SIZE)
+LINE_SIZE_BASE = size_overrides.get("line_size", DEFAULT_LINE_SIZE)
+ICON_SIZE_BASE = size_overrides.get("icon_size", DEFAULT_ICON_SIZE)
+BORDER_RADIUS_BASE = size_overrides.get("border_radius", DEFAULT_BORDER_RADIUS)
+SHADOW_OFFSET_BASE = size_overrides.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
+
+# Load config overrides
+CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
+config_overrides = {}
+if os.path.isfile(CONFIG_PATH):
+    with open(CONFIG_PATH) as f:
+        config_overrides = json.load(f)
+
+MAX_SHOW       = config_overrides.get("max_departures", 8)
+POLL_INTERVAL  = config_overrides.get("api_request_interval", 60)
+MAX_MINUTES    = config_overrides.get("max_minutes", 120)
 API_URL        = "https://search.ch/timetable/api/stationboard.fr.json"
 API_LIMIT      = 100
 FETCH_TIMEOUT  = 4
@@ -83,23 +112,25 @@ screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.NOFRAM
 pygame.mouse.set_visible(False)
 
 # ────────── Scaling ──────────
-design_w = DEFAULT_COLS * DEFAULT_CELL_W
-design_h = DEFAULT_ROWS * DEFAULT_BAR_H + (DEFAULT_ROWS - 1) * DEFAULT_BAR_MARGIN
+design_w = COLS * CELL_W_BASE * SCALE_MULTIPLIER
+design_h = ROWS * BAR_H_BASE * SCALE_MULTIPLIER + (ROWS - 1) * BAR_MARGIN_BASE * SCALE_MULTIPLIER
 scale    = min(info.current_w / design_w, info.current_h / design_h)
 
-CELL_W        = int(DEFAULT_CELL_W * scale)
-BAR_H         = int(DEFAULT_BAR_H * scale)
-BAR_MARGIN    = int(DEFAULT_BAR_MARGIN * scale)
-BAR_PADDING   = int(DEFAULT_BAR_PADDING * scale)
-CARD_PADDING  = int(DEFAULT_CARD_PADDING * scale)
-NUMBER_SIZE   = int(DEFAULT_NUMBER_SIZE * scale)
-STOP_NAME_SIZE= int(DEFAULT_STOP_NAME_SIZE * scale)
-LINE_SIZE     = int(DEFAULT_LINE_SIZE * scale)
-ICON_SIZE     = int(DEFAULT_ICON_SIZE * scale)
-BORDER_RADIUS = int(DEFAULT_BORDER_RADIUS * scale)
-SHADOW_OFFSET = int(DEFAULT_SHADOW_OFFSET * scale)
+CELL_W        = int(CELL_W_BASE * SCALE_MULTIPLIER * scale)
+BAR_H         = int(BAR_H_BASE * SCALE_MULTIPLIER * scale)
+BAR_MARGIN    = int(BAR_MARGIN_BASE * SCALE_MULTIPLIER * scale)
+BAR_PADDING   = int(BAR_PADDING_BASE * SCALE_MULTIPLIER * scale)
+CARD_PADDING  = int(CARD_PADDING_BASE * SCALE_MULTIPLIER * scale)
+NUMBER_SIZE   = int(NUMBER_SIZE_BASE * SCALE_MULTIPLIER * scale)
+NOW_SIZE      = int(NOW_SIZE_BASE * SCALE_MULTIPLIER * scale)
+STOP_NAME_SIZE= int(STOP_NAME_SIZE_BASE * SCALE_MULTIPLIER * scale)
+LINE_SIZE     = int(LINE_SIZE_BASE * SCALE_MULTIPLIER * scale)
+ICON_SIZE     = int(ICON_SIZE_BASE * SCALE_MULTIPLIER * scale)
+BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale)
+SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale)
 
 font_num  = pygame.font.SysFont("DejaVuSans", NUMBER_SIZE, bold=True)
+font_now  = pygame.font.SysFont("DejaVuSans", NOW_SIZE, bold=True)
 font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
 font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
 icon_w = icon_h = ICON_SIZE
@@ -140,14 +171,28 @@ def fetch(stop):
     for c in data.get("connections", []):
         line = c.get("*L") or c.get("line")
         term = c.get("terminal", {}).get("id")
-        if line not in stop["Lines"] or term != stop["Lines"][line]:
-            continue
+        
+        # Filter logic
+        if "LinesInclude" in stop:
+            include = stop["LinesInclude"]
+            if line not in include:
+                continue
+            if isinstance(include[line], str) and term != include[line]:
+                continue
+        elif "LinesExclude" in stop:
+            exclude = stop["LinesExclude"]
+            if line in exclude:
+                if isinstance(exclude[line], str) and term == exclude[line]:
+                    continue
+                elif exclude[line] is None:
+                    continue
+        # No filtering if neither LinesInclude nor LinesExclude
         try:
             ts = datetime.datetime.strptime(c["time"], "%Y-%m-%d %H:%M:%S")
         except ValueError:
             continue
         delta = round((ts - now).total_seconds() / 60)
-        if delta < -1:
+        if delta < 0 or delta > MAX_MINUTES:
             continue
         deps.append((ts, line, max(delta, 0)))
     deps.sort(key=lambda x: x[0])
@@ -167,7 +212,7 @@ def draw_bar(y, name, deps):
     if not deps:
         return
     
-    cols = min(len(deps), DEFAULT_COLS - 1)
+    cols = min(len(deps), COLS - 1)
     total_w = cols * CELL_W + BAR_PADDING * 2
     x0 = (info.current_w - total_w) // 2
     
@@ -216,8 +261,12 @@ def draw_bar(y, name, deps):
         draw_rounded_rect(screen, card_color, dep_rect, 8)
         
         # Minutes
-        min_text = str(mn) if mn > 0 else "NOW"
-        min_surf = font_num.render(min_text, True, text_color)
+        if mn > 0:
+            min_text = str(mn)
+            min_surf = font_num.render(min_text, True, text_color)
+        else:
+            min_text = "NOW"
+            min_surf = font_now.render(min_text, True, text_color)
         min_x = card_x + (card_w - min_surf.get_width()) // 2
         min_y = content_y + (content_h // 4) - (min_surf.get_height() // 2)
         screen.blit(min_surf, (min_x, min_y))
