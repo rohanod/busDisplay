@@ -31,6 +31,15 @@ def download_and_parse_stops():
         print(f"An error occurred while parsing stops data: {e}")
         sys.exit(1)
 
+import unicodedata
+
+def normalize_str(s):
+    """Lowercase, and remove accents from a string."""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', s.lower()) 
+        if unicodedata.category(c) != 'Mn'
+    )
+
 def find_stop(stops_data, prompt_text):
     """Interactively prompts the user to find and select a stop."""
     while True:
@@ -40,9 +49,10 @@ def find_stop(stops_data, prompt_text):
                 print("Search term cannot be empty.")
                 continue
 
+            normalized_search = normalize_str(search_term)
             matches = [
                 stop for stop in stops_data 
-                if search_term.lower() in stop.get('Stop', '').lower()
+                if normalized_search in normalize_str(stop.get('Stop', ''))
             ]
 
             if not matches:
@@ -50,7 +60,15 @@ def find_stop(stops_data, prompt_text):
                 continue
             
             if len(matches) == 1:
-                return matches[0]
+                stop = matches[0]
+                confirm = questionary.confirm(
+                    f"Is this the correct stop? {stop['Stop']} ({stop['Municipality']}, {stop['Country']})"
+                ).ask()
+                if confirm:
+                    return stop
+                else:
+                    print("Search cancelled. Please try again.")
+                    continue
 
             choices = [
                 f"{stop['Stop']} ({stop['Municipality']}, {stop['Country']})" 

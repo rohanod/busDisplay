@@ -19,6 +19,8 @@ def _excepthook(exc_type, exc_value, exc_tb):
 sys.excepthook = _excepthook
 log = logging.getLogger("busDisplay")
 
+log.info("Starting Bus Display application")
+
 # ────────── Initial Defaults (pre-scaling) ──────────
 DEFAULT_SCALE_MULTIPLIER   = 1.0
 DEFAULT_COLS               = 8
@@ -92,12 +94,19 @@ TEXT_SECONDARY = (174, 174, 178)
 ACCENT_COLOR   = ORANGE
 
 # ────────── Pygame init ──────────
+log.info(f"DISPLAY environment: {os.environ.get('DISPLAY', 'Not set')}")
 if "DISPLAY" not in os.environ:
+    log.info("No DISPLAY found, using fbcon")
     os.environ["SDL_VIDEODRIVER"] = "fbcon"
     os.environ["SDL_AUDIODRIVER"] = "dummy"
+else:
+    log.info("DISPLAY found, using X11")
 
+log.info("Initializing pygame")
 pygame.init()
+log.info("Initializing pygame display")
 pygame.display.init()
+log.info("Pygame initialized successfully")
 info = pygame.display.Info()
 screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.NOFRAME)
 pygame.mouse.set_visible(False)
