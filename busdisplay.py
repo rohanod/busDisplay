@@ -1,7 +1,7 @@
 import os, sys, logging, datetime, time, json, requests, pygame, io, cairosvg
 
 # ────────── Logging ──────────
-LOG_FILE = "busDisplay.log"
+LOG_FILE = os.path.expanduser("~/busdisplay/busDisplay.log")
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)s %(message)s",
