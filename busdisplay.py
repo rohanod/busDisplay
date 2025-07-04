@@ -2,13 +2,13 @@ import os, sys, logging, datetime, time, json, requests, pygame, io, cairosvg
 
 # ────────── Logging ──────────
 LOG_FILE = os.path.expanduser("~/busdisplay/busDisplay.log")
+handlers = [logging.FileHandler(LOG_FILE, encoding="utf-8")]
+if os.isatty(sys.stdout.fileno()):
+    handlers.append(logging.StreamHandler(sys.stdout))
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(sys.stdout),
-    ],
+    handlers=handlers,
 )
 logging.captureWarnings(True)
 
@@ -114,13 +114,14 @@ next_poll  = [0]    * rows
 
 # ────────── Networking ──────────
 def fetch(stop):
+    limit = stop.get("Limit", API_LIMIT)
     try:
         data = requests.get(
             API_URL,
             params={
                 "stop": stop["ID"],
                 "transportation_types": "bus,tram",
-                "limit": API_LIMIT,
+                "limit": limit,
             },
             timeout=FETCH_TIMEOUT,
         ).json()

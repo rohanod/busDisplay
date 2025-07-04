@@ -148,6 +148,15 @@ def build_stop_config(stops_data):
             lines_dict[line] = None
     
     config_entry[filter_type] = lines_dict
+    
+    # Ask about API limit for busy stops
+    if questionary.confirm(f"Is '{main_stop.get('Stop')}' a busy stop that needs more API results? (default: 100)", default=False).ask():
+        limit = questionary.text("Enter API limit (e.g., 300 for very busy stops):", default="300").ask()
+        try:
+            config_entry["Limit"] = int(limit)
+        except ValueError:
+            print("Invalid limit value. Using default (100).")
+    
     return config_entry
 
 def manage_settings(config, section_name, settings):
@@ -204,7 +213,7 @@ def main():
                 "cell_w": DEFAULTS["cell_w"], "bar_h": DEFAULTS["bar_h"], "number_size": DEFAULTS["number_size"],
                 "now_size": DEFAULTS["now_size"], "stop_name_size": DEFAULTS["stop_name_size"],
                 "line_size": DEFAULTS["line_size"], "icon_size": DEFAULTS["icon_size"],
-                "scale_multiplier": DEFAULTS["scale_multiplier"]
+                "grid_shrink": 0.8
             })
         elif choice == "API & Behavior":
             config = manage_settings(config, "API & Behavior", {

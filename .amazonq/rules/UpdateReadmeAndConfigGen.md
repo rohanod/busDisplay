@@ -1,0 +1,1 @@
+Whenever you are updating the configuration options, ALWAYS make sure to update the config_generator.py file and the README.md file to have the new/updated options.

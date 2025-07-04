@@ -54,6 +54,7 @@ If you prefer to edit the file by hand, create `~/.config/busdisplay/config.json
 - `{"ID": "8592791", "LinesInclude": {"10": null}}` - Only line 10 to any destination
 - `{"ID": "8592855", "LinesExclude": {"22": "8592843", "53": null}}` - Exclude line 22 to 8592843 and all line 53
 - `{"ID": "8587061"}` - All departures (no filtering)
+- `{"ID": "8592791", "Limit": 300}` - Fetch up to 300 departures (default: 100) for busy stops
 
 ### Configuration Options
 
