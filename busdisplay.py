@@ -137,8 +137,8 @@ font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
 font_clock = pygame.font.SysFont("DejaVuSans", int(STOP_NAME_SIZE * 0.8), bold=True)
 
 # Fixed card dimensions
-FIXED_CARD_W = int(140 * SCALE_MULTIPLIER * scale)
-FIXED_CELL_W = int(120 * SCALE_MULTIPLIER * scale)
+FIXED_CARD_W = int(800 * SCALE_MULTIPLIER * scale)
+FIXED_CELL_W = int(100 * SCALE_MULTIPLIER * scale)
 icon_w = icon_h = ICON_SIZE
 
 def _load_svg(path: str) -> pygame.Surface:
@@ -220,6 +220,10 @@ def draw_bar_at_pos(x, y, name, deps):
     
     cols = min(len(deps), COLS - 1)
     total_w = FIXED_CARD_W
+    
+    # Calculate available width for departure cards
+    available_w = total_w - (BAR_PADDING * 2) - ICON_SIZE - CARD_PADDING
+    card_w = available_w // max(1, cols) if cols > 0 else FIXED_CELL_W
     x0 = x
     
     # Draw shadow
@@ -247,7 +251,6 @@ def draw_bar_at_pos(x, y, name, deps):
     
     # Departure cards
     card_start_x = icon_x + ICON_SIZE + CARD_PADDING
-    card_w = FIXED_CELL_W
     
     for i, (_, ln, mn) in enumerate(deps[:cols]):
         card_x = card_start_x + i * card_w
