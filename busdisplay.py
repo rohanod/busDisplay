@@ -37,6 +37,7 @@ DEFAULT_LINE_SIZE          = 36
 DEFAULT_ICON_SIZE          = 40
 DEFAULT_BORDER_RADIUS      = 16
 DEFAULT_SHADOW_OFFSET      = 6
+DEFAULT_GRID_SHRINK        = 0.8
 
 # ────────── Runtime Config ──────────
 CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
@@ -69,6 +70,7 @@ LINE_SIZE_BASE = config.get("line_size", DEFAULT_LINE_SIZE)
 ICON_SIZE_BASE = config.get("icon_size", DEFAULT_ICON_SIZE)
 BORDER_RADIUS_BASE = config.get("border_radius", DEFAULT_BORDER_RADIUS)
 SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
+GRID_SHRINK = config.get("grid_shrink", DEFAULT_GRID_SHRINK)
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
 MAX_SHOW       = config.get("max_departures", 8)
@@ -299,18 +301,21 @@ def main():
     design_h = ROWS * BAR_H_BASE * SCALE_MULTIPLIER + (ROWS - 1) * BAR_MARGIN_BASE * SCALE_MULTIPLIER
     scale    = min(info.current_w / design_w, info.current_h / design_h)
     
-    CELL_W        = int(CELL_W_BASE * SCALE_MULTIPLIER * scale)
-    BAR_H         = int(BAR_H_BASE * SCALE_MULTIPLIER * scale)
-    BAR_MARGIN    = int(BAR_MARGIN_BASE * SCALE_MULTIPLIER * scale)
-    BAR_PADDING   = int(BAR_PADDING_BASE * SCALE_MULTIPLIER * scale)
-    CARD_PADDING  = int(CARD_PADDING_BASE * SCALE_MULTIPLIER * scale)
-    NUMBER_SIZE   = int(NUMBER_SIZE_BASE * SCALE_MULTIPLIER * scale)
-    NOW_SIZE      = int(NOW_SIZE_BASE * SCALE_MULTIPLIER * scale)
-    STOP_NAME_SIZE= int(STOP_NAME_SIZE_BASE * SCALE_MULTIPLIER * scale)
-    LINE_SIZE     = int(LINE_SIZE_BASE * SCALE_MULTIPLIER * scale)
-    ICON_SIZE     = int(ICON_SIZE_BASE * SCALE_MULTIPLIER * scale)
-    BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale)
-    SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale)
+    # Apply grid shrink for 3+ stops
+    grid_scale = GRID_SHRINK if rows > 2 else 1.0
+    
+    CELL_W        = int(CELL_W_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    BAR_H         = int(BAR_H_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    BAR_MARGIN    = int(BAR_MARGIN_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    BAR_PADDING   = int(BAR_PADDING_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    CARD_PADDING  = int(CARD_PADDING_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    NUMBER_SIZE   = int(NUMBER_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    NOW_SIZE      = int(NOW_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    STOP_NAME_SIZE= int(STOP_NAME_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    LINE_SIZE     = int(LINE_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    ICON_SIZE     = int(ICON_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     
     # Initialize fonts and images after scaling is calculated
     font_num  = pygame.font.SysFont("DejaVuSans", NUMBER_SIZE, bold=True)
@@ -321,8 +326,8 @@ def main():
     
     # Fixed card dimensions
     global FIXED_CARD_W, FIXED_CELL_W
-    FIXED_CARD_W = int(800 * SCALE_MULTIPLIER * scale)
-    FIXED_CELL_W = int(100 * SCALE_MULTIPLIER * scale)
+    FIXED_CARD_W = int(800 * SCALE_MULTIPLIER * scale * grid_scale)
+    FIXED_CELL_W = int(100 * SCALE_MULTIPLIER * scale * grid_scale)
     
     clock_img = _load_svg(CLOCK_SVG_FILE, ICON_SIZE, ICON_SIZE)
     tram_img  = _load_svg(TRAM_SVG_FILE, ICON_SIZE, ICON_SIZE)

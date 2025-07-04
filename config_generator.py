@@ -169,6 +169,8 @@ def manage_settings(config, section_name, settings):
             print(f"Invalid input for {key}. Keeping current value: {current_val}")
     return config
 
+import subprocess
+
 def main():
     print("Welcome to the Bus Display Config Generator!")
     config = load_config()
@@ -181,7 +183,7 @@ def main():
 
         choice = questionary.select(
             "What would you like to configure?",
-            choices=["Stops", "Layout", "Sizing", "API & Behavior", "Save and Exit", "Exit Without Saving"]
+            choices=["Stops", "Layout", "Sizing", "API & Behavior", "Save and Restart", "Save and Exit", "Exit Without Saving"]
         ).ask()
 
         if choice == "Stops":
@@ -209,6 +211,17 @@ def main():
                 "max_departures": DEFAULTS["max_departures"], "api_request_interval": DEFAULTS["api_request_interval"],
                 "max_minutes": DEFAULTS["max_minutes"], "show_clock": DEFAULTS["show_clock"]
             })
+        elif choice == "Save and Restart":
+            save_config(config)
+            if questionary.confirm("Do you want to restart the bus display service now?").ask():
+                print("Attempting to restart the service...")
+                try:
+                    subprocess.run(["sudo", "systemctl", "restart", "busdisplay"], check=True)
+                    print("Service restarted successfully.")
+                except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                    print(f"Failed to restart service: {e}")
+                    print("Please ensure the service is installed and you are running this script on the Raspberry Pi.")
+            break
         elif choice == "Save and Exit":
             save_config(config)
             break
@@ -217,6 +230,7 @@ def main():
                 break
         elif choice is None: # User pressed Ctrl+C
             break
+
 
 if __name__ == "__main__":
     main()

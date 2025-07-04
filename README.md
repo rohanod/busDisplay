@@ -20,7 +20,20 @@ curl -fsSL https://raw.githubusercontent.com/rohanod/busDisplay/main/install.sh 
 
 ## Configuration
 
-Create `~/.config/busdisplay/config.json` to configure your display:
+### Easy Configuration with the Interactive Tool
+
+For a much easier setup experience, you can use the interactive configuration tool. It helps you search for stops and configure all display options from a simple menu.
+
+To launch the tool, run:
+```bash
+cd ~/busdisplay
+source venv/bin/activate
+python config_generator.py
+```
+
+### Manual Configuration
+
+If you prefer to edit the file by hand, create `~/.config/busdisplay/config.json` to configure your display:
 
 ```json
 {
@@ -65,6 +78,7 @@ Create `~/.config/busdisplay/config.json` to configure your display:
 | `icon_size` | Clock/tram icon size | `40` | `36` |
 | `border_radius` | Card corner radius | `16` | `12` |
 | `shadow_offset` | Card shadow offset | `6` | `4` |
+| `grid_shrink` | Shrink multiplier for 3+ stops | `0.8` | `0.7` |
 
 ### Layout Behavior
 - **1-2 stops**: Vertical stack
