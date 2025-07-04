@@ -21,17 +21,19 @@ sys.excepthook = _excepthook
 log = logging.getLogger("busDisplay")
 
 # ────────── Initial Defaults (pre-scaling) ──────────
-DEFAULT_COLS               = 11
+DEFAULT_COLS               = 8
 DEFAULT_ROWS               = 2
-DEFAULT_CELL_W             = 200
-DEFAULT_BAR_H              = 200
-DEFAULT_BAR_MARGIN         = 12
-DEFAULT_BAR_PADDING_TOP    = 8
-DEFAULT_BAR_PADDING_BOTTOM = 18
-DEFAULT_NUMBER_SIZE        = 48
-DEFAULT_STOP_NAME_SIZE     = 40
-DEFAULT_ICON_SIZE          = 60
-DEFAULT_MINUTE_LINE_GAP    = 20  # extra gap between minutes & line rows
+DEFAULT_CELL_W             = 140
+DEFAULT_BAR_H              = 320
+DEFAULT_BAR_MARGIN         = 30
+DEFAULT_BAR_PADDING        = 25
+DEFAULT_CARD_PADDING       = 15
+DEFAULT_NUMBER_SIZE        = 64
+DEFAULT_STOP_NAME_SIZE     = 48
+DEFAULT_LINE_SIZE          = 36
+DEFAULT_ICON_SIZE          = 40
+DEFAULT_BORDER_RADIUS      = 16
+DEFAULT_SHADOW_OFFSET      = 6
 
 # ────────── Runtime Config ──────────
 CFG_PATH = os.path.expanduser("~/.config/busdisplay/stops.json")
@@ -59,9 +61,15 @@ SPINNER        = "|/-\\"
 CLOCK_SVG_FILE = os.path.join(os.path.dirname(__file__), "clock.svg")
 TRAM_SVG_FILE  = os.path.join(os.path.dirname(__file__), "tram.svg")
 
-BLACK, ORANGE  = (0, 0, 0), (255, 102, 0)
-BG_CELL, BG_HL = (22, 22, 22), ORANGE
-FG_TXT, FG_HL  = ORANGE, BLACK
+BLACK, WHITE   = (0, 0, 0), (255, 255, 255)
+ORANGE, RED    = (255, 140, 0), (255, 69, 58)
+BLUE, GREEN    = (0, 122, 255), (52, 199, 89)
+DARK_BG        = (18, 18, 20)
+CARD_BG        = (44, 44, 46)
+CARD_SHADOW    = (0, 0, 0, 60)
+TEXT_PRIMARY   = (255, 255, 255)
+TEXT_SECONDARY = (174, 174, 178)
+ACCENT_COLOR   = ORANGE
 
 # ────────── Pygame init ──────────
 if "DISPLAY" not in os.environ:
@@ -82,15 +90,18 @@ scale    = min(info.current_w / design_w, info.current_h / design_h)
 CELL_W        = int(DEFAULT_CELL_W * scale)
 BAR_H         = int(DEFAULT_BAR_H * scale)
 BAR_MARGIN    = int(DEFAULT_BAR_MARGIN * scale)
-PAD_TOP       = int(DEFAULT_BAR_PADDING_TOP * scale)
-PAD_BOT       = int(DEFAULT_BAR_PADDING_BOTTOM * scale)
+BAR_PADDING   = int(DEFAULT_BAR_PADDING * scale)
+CARD_PADDING  = int(DEFAULT_CARD_PADDING * scale)
 NUMBER_SIZE   = int(DEFAULT_NUMBER_SIZE * scale)
 STOP_NAME_SIZE= int(DEFAULT_STOP_NAME_SIZE * scale)
+LINE_SIZE     = int(DEFAULT_LINE_SIZE * scale)
 ICON_SIZE     = int(DEFAULT_ICON_SIZE * scale)
-MINUTE_GAP    = int(DEFAULT_MINUTE_LINE_GAP * scale)
+BORDER_RADIUS = int(DEFAULT_BORDER_RADIUS * scale)
+SHADOW_OFFSET = int(DEFAULT_SHADOW_OFFSET * scale)
 
-font     = pygame.font.SysFont("DejaVuSansMono", NUMBER_SIZE,  bold=True)
-lab_font = pygame.font.SysFont("DejaVuSansMono", STOP_NAME_SIZE, bold=True)
+font_num  = pygame.font.SysFont("DejaVuSans", NUMBER_SIZE, bold=True)
+font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
+font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
 icon_w = icon_h = ICON_SIZE
 
 def _load_svg(path: str) -> pygame.Surface:
@@ -142,53 +153,91 @@ def fetch(stop):
     deps.sort(key=lambda x: x[0])
     return name, deps[:MAX_SHOW]
 
+def draw_rounded_rect(surf, color, rect, radius):
+    pygame.draw.rect(surf, color, rect, border_radius=radius)
+
+def draw_shadow(surf, rect, offset, color):
+    shadow_rect = (rect[0] + offset, rect[1] + offset, rect[2], rect[3])
+    shadow_surf = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
+    pygame.draw.rect(shadow_surf, color, (0, 0, rect[2], rect[3]), border_radius=BORDER_RADIUS)
+    surf.blit(shadow_surf, (shadow_rect[0], shadow_rect[1]))
+
 # ────────── Drawing ──────────
 def draw_bar(y, name, deps):
-    cols     = max(1, len(deps)) + 1
-    total_w  = CELL_W * cols
-    x0       = (info.current_w - total_w) // 2
-
-    pygame.draw.rect(screen, BG_CELL, (x0, y, total_w, BAR_H))
-
-    # stop name
-    label = lab_font.render(name, True, ORANGE)
-    screen.blit(label, ((info.current_w - label.get_width()) // 2, y + PAD_TOP))
-
-    # row anchors
-    minutes_y = y + PAD_TOP + STOP_NAME_SIZE + PAD_TOP
-    line_y    = minutes_y + NUMBER_SIZE + MINUTE_GAP
-
-    # icons (vertically centered against their row)
-    screen.blit(clock_img, (x0 + PAD_TOP, minutes_y + (NUMBER_SIZE - icon_h) // 2))
-    screen.blit(tram_img,  (x0 + PAD_TOP, line_y    + (NUMBER_SIZE - icon_h) // 2))
-
-    for i, (_, ln, mn) in enumerate(deps, 1):
-        cx   = x0 + i * CELL_W
-        col  = FG_HL if mn == 0 else FG_TXT
+    if not deps:
+        return
+    
+    cols = min(len(deps), DEFAULT_COLS - 1)
+    total_w = cols * CELL_W + BAR_PADDING * 2
+    x0 = (info.current_w - total_w) // 2
+    
+    # Draw shadow
+    card_rect = (x0, y, total_w, BAR_H)
+    draw_shadow(screen, card_rect, SHADOW_OFFSET, CARD_SHADOW)
+    
+    # Draw main card
+    draw_rounded_rect(screen, CARD_BG, card_rect, BORDER_RADIUS)
+    
+    # Stop name header
+    stop_surf = font_stop.render(name, True, TEXT_PRIMARY)
+    stop_x = x0 + (total_w - stop_surf.get_width()) // 2
+    screen.blit(stop_surf, (stop_x, y + BAR_PADDING))
+    
+    # Content area
+    content_y = y + BAR_PADDING + STOP_NAME_SIZE + BAR_PADDING
+    content_h = BAR_H - (BAR_PADDING * 3 + STOP_NAME_SIZE)
+    
+    # Icons
+    icon_x = x0 + BAR_PADDING
+    clock_y = content_y + (content_h // 4) - (icon_h // 2)
+    tram_y = content_y + (3 * content_h // 4) - (icon_h // 2)
+    screen.blit(clock_img, (icon_x, clock_y))
+    screen.blit(tram_img, (icon_x, tram_y))
+    
+    # Departure cards
+    card_start_x = icon_x + ICON_SIZE + CARD_PADDING
+    card_w = (total_w - card_start_x - BAR_PADDING) // cols
+    
+    for i, (_, ln, mn) in enumerate(deps[:cols]):
+        card_x = card_start_x + i * card_w
+        
+        # Departure card background
         if mn == 0:
-            pygame.draw.rect(screen, BG_HL, (cx, y, CELL_W, BAR_H))
-
-        # minutes
-        m_txt = str(mn)
-        w_m, _ = font.size(m_txt)
-        screen.blit(font.render(m_txt, True, col),
-                    (cx + (CELL_W - w_m)//2, minutes_y))
-
-        # line id
-        w_ln, _ = font.size(ln)
-        screen.blit(font.render(ln, True, col),
-                    (cx + (CELL_W - w_ln)//2, line_y))
+            card_color = RED
+            text_color = WHITE
+        elif mn <= 2:
+            card_color = ORANGE
+            text_color = WHITE
+        else:
+            card_color = (60, 60, 65)
+            text_color = TEXT_PRIMARY
+            
+        dep_rect = (card_x + 2, content_y + 5, card_w - 4, content_h - 10)
+        draw_rounded_rect(screen, card_color, dep_rect, 8)
+        
+        # Minutes
+        min_text = str(mn) if mn > 0 else "NOW"
+        min_surf = font_num.render(min_text, True, text_color)
+        min_x = card_x + (card_w - min_surf.get_width()) // 2
+        min_y = content_y + (content_h // 4) - (min_surf.get_height() // 2)
+        screen.blit(min_surf, (min_x, min_y))
+        
+        # Line number
+        line_surf = font_line.render(ln, True, text_color)
+        line_x = card_x + (card_w - line_surf.get_width()) // 2
+        line_y = content_y + (3 * content_h // 4) - (line_surf.get_height() // 2)
+        screen.blit(line_surf, (line_x, line_y))
 
 # ────────── Main loop ──────────
 def main():
     clk = pygame.time.Clock()
     while True:
         frame = (pygame.time.get_ticks()//250) % len(SPINNER)
-        screen.fill(BLACK)
+        screen.fill(DARK_BG)
 
         if any(r is None for r in results):
             msg  = f"Loading {SPINNER[frame]}"
-            surf = font.render(msg, True, ORANGE)
+            surf = font_num.render(msg, True, ACCENT_COLOR)
             screen.blit(surf, ((info.current_w - surf.get_width())//2,
                                (info.current_h - surf.get_height())//2))
         else:

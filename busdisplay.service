@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=__HOME__/busdisplay
-ExecStartPre=/usr/bin/env bash __HOME__/busdisplay/update.sh
+ExecStartPre=/usr/bin/sudo -u __USER__ /usr/bin/env bash __HOME__/busdisplay/update.sh
 ExecStart=/usr/bin/sudo -u __USER__ /usr/bin/startx __HOME__/.xinitrc -- :0 vt1 -keeptty -quiet
 Restart=on-failure
 RestartSec=5

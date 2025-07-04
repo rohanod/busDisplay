@@ -11,7 +11,7 @@ echo "Installing Bus Display for Raspberry Pi..."
 # Install required packages
 echo "Installing system packages..."
 sudo apt update
-sudo apt install -y git xserver-xorg xinit python3-venv python3-pip
+sudo apt install -y git xserver-xorg xinit python3-venv python3-pip x11-xserver-utils
 
 # Add user to required groups for X11 and console access
 echo "Configuring X11 permissions..."
