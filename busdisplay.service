@@ -1,0 +1,18 @@
+[Unit]
+Description=Bus Display + on-boot update
+After=network.target
+
+[Service]
+User=__USER__
+WorkingDirectory=__HOME__/busdisplay
+ExecStartPre=/usr/bin/env bash __HOME__/busdisplay/update.sh
+ExecStart=/usr/bin/startx __HOME__/.xinitrc -- :0 vt0 -keeptty -quiet
+Restart=on-failure
+RestartSec=5
+TTYPath=/dev/tty0
+TTYReset=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

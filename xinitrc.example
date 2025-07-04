@@ -1,0 +1,8 @@
+#!/bin/bash
+# Disable screen blanking and power management
+xset s off
+xset -dpms
+xset s noblank
+
+# Start the bus display application
+exec __HOME__/busdisplay/venv/bin/python __HOME__/busdisplay/busdisplay.py

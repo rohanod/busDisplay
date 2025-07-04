@@ -3,7 +3,7 @@ You are writing a small “OTA-updating bus-display” project for Raspberry Pi 
 The repo URL will be **rohanod/busDisplay**.  Everything lives at the repo root
 except a user-editable JSON config in `~/.config/busdisplay/stops.json`.
 
-# Files & their roles  (⚠️  do *not* output the file bodies here)
+# Files & their roles
 
 1. **busdisplay.py**  
    * Reads `~/.config/busdisplay/stops.json` (same schema the user has been
