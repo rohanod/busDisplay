@@ -3,10 +3,10 @@ Description=Bus Display + on-boot update
 After=network.target
 
 [Service]
-User=__USER__
+User=root
 WorkingDirectory=__HOME__/busdisplay
 ExecStartPre=/usr/bin/env bash __HOME__/busdisplay/update.sh
-ExecStart=/usr/bin/startx __HOME__/.xinitrc -- :0 vt0 -keeptty -quiet
+ExecStart=/usr/bin/sudo -u __USER__ /usr/bin/startx __HOME__/.xinitrc -- :0 vt1 -keeptty -quiet
 Restart=on-failure
 RestartSec=5
 TTYPath=/dev/tty0

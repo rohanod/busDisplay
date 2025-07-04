@@ -13,6 +13,12 @@ echo "Installing system packages..."
 sudo apt update
 sudo apt install -y git xserver-xorg xinit python3-venv python3-pip
 
+# Add user to required groups for X11 and console access
+echo "Configuring X11 permissions..."
+sudo usermod -a -G video,tty "$USER_NAME"
+echo "allowed_users=anybody" | sudo tee /etc/X11/Xwrapper.config
+echo "needs_root_rights=yes" | sudo tee -a /etc/X11/Xwrapper.config
+
 # Clone or update repository
 if [ -d "$INSTALL_DIR" ]; then
     echo "Updating existing repository..."
