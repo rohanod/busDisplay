@@ -241,7 +241,7 @@ def draw_bar_at_pos(x, y, name, deps):
         line_y = content_y + (3 * content_h // 4) - (line_surf.get_height() // 2)
         screen.blit(line_surf, (line_x, line_y))
 
-def get_layout_positions(num_stops):
+def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
     positions = []
     if num_stops <= 2:
         # Vertical stack
@@ -370,7 +370,7 @@ def main():
                     clock_surf = font_clock.render(current_time, True, TEXT_SECONDARY)
                     screen.blit(clock_surf, (20, 20))
                 
-                positions = get_layout_positions(rows)
+                positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
                 for idx, (x, y) in enumerate(positions[:rows]):
                     draw_bar_at_pos(x, y, *results[idx])
 
@@ -390,7 +390,7 @@ def main():
 
         # Sleep based on loading state
         if loading:
-            time.sleep(1)  # 1fps during loading
+            time.sleep(1/24)  # 24fps during loading
         else:
             time.sleep(1)  # Check every second for minute changes
 
