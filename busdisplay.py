@@ -169,7 +169,7 @@ def draw_shadow(surf, rect, offset, color):
     surf.blit(shadow_surf, (shadow_rect[0], shadow_rect[1]))
 
 # ────────── Drawing ──────────
-def draw_bar_at_pos(x, y, name, deps):
+def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_num, font_now, font_line):
     if not deps:
         return
     
@@ -178,7 +178,7 @@ def draw_bar_at_pos(x, y, name, deps):
     
     # Calculate available width for departure cards
     available_w = total_w - (BAR_PADDING * 2) - ICON_SIZE - CARD_PADDING
-    card_w = available_w // max(1, cols) if cols > 0 else FIXED_CELL_W
+    card_w = available_w // max(1, cols) if cols > 0 else 100
     x0 = x
     
     # Draw shadow
@@ -199,8 +199,8 @@ def draw_bar_at_pos(x, y, name, deps):
     
     # Icons
     icon_x = x0 + BAR_PADDING
-    clock_y = content_y + (content_h // 4) - (icon_h // 2)
-    tram_y = content_y + (3 * content_h // 4) - (icon_h // 2)
+    clock_y = content_y + (content_h // 4) - (ICON_SIZE // 2)
+    tram_y = content_y + (3 * content_h // 4) - (ICON_SIZE // 2)
     screen.blit(clock_img, (icon_x, clock_y))
     screen.blit(tram_img, (icon_x, tram_y))
     
@@ -372,7 +372,7 @@ def main():
                 
                 positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
                 for idx, (x, y) in enumerate(positions[:rows]):
-                    draw_bar_at_pos(x, y, *results[idx])
+                    draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_num, font_now, font_line)
 
             pygame.display.flip()
 

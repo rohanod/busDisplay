@@ -6,42 +6,60 @@ import io
 import json
 import os
 import sys
+import unicodedata
 
 ARRETS_CSV_URL = "https://raw.githubusercontent.com/rohanod/arrets/refs/heads/main/arrets.csv"
 DEFAULT_CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
 
+# Default values from busdisplay.py
+DEFAULTS = {
+    "stops": [],
+    "cols": 8, "rows": 2, "cell_w": 140, "bar_h": 320, "bar_margin": 30,
+    "bar_padding": 25, "card_padding": 15, "number_size": 48, "now_size": 30,
+    "stop_name_size": 48, "line_size": 36, "icon_size": 40, "border_radius": 16,
+    "shadow_offset": 6, "scale_multiplier": 1.0, "max_departures": 8,
+    "api_request_interval": 60, "max_minutes": 120, "show_clock": True
+}
+
+def load_config():
+    if os.path.exists(DEFAULT_CONFIG_PATH):
+        try:
+            with open(DEFAULT_CONFIG_PATH, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Could not read existing config file: {e}. Starting with defaults.")
+    return DEFAULTS.copy()
+
+def save_config(config):
+    try:
+        os.makedirs(os.path.dirname(DEFAULT_CONFIG_PATH), exist_ok=True)
+        with open(DEFAULT_CONFIG_PATH, 'w') as f:
+            json.dump(config, f, indent=4)
+        print(f"Configuration successfully saved to {DEFAULT_CONFIG_PATH}")
+    except IOError as e:
+        print(f"Error saving configuration file: {e}")
+
 def download_and_parse_stops():
-    """Downloads and parses the TPG stops CSV file."""
     try:
         print("Downloading stops data from GitHub...")
         response = requests.get(ARRETS_CSV_URL)
         response.raise_for_status()
-        
         content = response.text
-        # The first line of the CSV is the header, so we can read it directly.
         reader = csv.DictReader(io.StringIO(content), delimiter=';')
-        
         stops = [row for row in reader if row.get('Actif') == 'Y' and row.get('Didoc Code')]
         print(f"Successfully loaded {len(stops)} active stops.")
         return stops
     except requests.exceptions.RequestException as e:
         print(f"Error downloading stops file: {e}")
-        sys.exit(1)
+        return None
     except Exception as e:
         print(f"An error occurred while parsing stops data: {e}")
-        sys.exit(1)
-
-import unicodedata
+        return None
 
 def normalize_str(s):
-    """Lowercase, and remove accents from a string."""
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', s.lower()) 
-        if unicodedata.category(c) != 'Mn'
-    )
+    return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
 
 def find_stop(stops_data, prompt_text):
-    """Interactively prompts the user to find and select a stop."""
     while True:
         try:
             search_term = questionary.text(prompt_text).ask()
@@ -50,52 +68,58 @@ def find_stop(stops_data, prompt_text):
                 continue
 
             normalized_search = normalize_str(search_term)
-            matches = [
-                stop for stop in stops_data 
-                if normalized_search in normalize_str(stop.get('Stop', ''))
-            ]
+            matches = [s for s in stops_data if normalized_search in normalize_str(s.get('Stop', ''))]
 
             if not matches:
                 print(f"No stops found matching '{search_term}'. Please try again.")
                 continue
-            
+
             if len(matches) == 1:
                 stop = matches[0]
-                confirm = questionary.confirm(
-                    f"Is this the correct stop? {stop['Stop']} ({stop['Municipality']}, {stop['Country']})"
-                ).ask()
-                if confirm:
+                if questionary.confirm(f"Is this the correct stop? {stop['Stop']} ({stop['Municipality']}, {stop['Country']})").ask():
                     return stop
                 else:
                     print("Search cancelled. Please try again.")
                     continue
-
-            choices = [
-                f"{stop['Stop']} ({stop['Municipality']}, {stop['Country']})" 
-                for stop in matches
-            ]
-            selected_choice = questionary.select(
-                "Multiple stops found. Please choose one:",
-                choices=choices
-            ).ask()
             
-            if not selected_choice:
-                return None
+            choices = [f"{s['Stop']} ({s['Municipality']}, {s['Country']})" for s in matches]
+            selected = questionary.select("Multiple stops found. Please choose one:", choices=choices).ask()
+            if not selected: return None
+            
+            return next(s for s in matches if selected == f"{s['Stop']} ({s['Municipality']}, {s['Country']})")
 
-            for stop in matches:
-                if selected_choice == f"{stop['Stop']} ({stop['Municipality']}, {stop['Country']})":
-                    return stop
         except (KeyboardInterrupt, TypeError):
-             print("\nOperation cancelled.")
-             return None
+            print("\nOperation cancelled.")
+            return None
+
+def manage_stops(config, stops_data):
+    while True:
+        action = questionary.select(
+            "Manage Stops:",
+            choices=["Add a new stop", "Edit an existing stop", "Remove a stop", "Back to main menu"]
+        ).ask()
+
+        if action == "Add a new stop":
+            stop_config = build_stop_config(stops_data)
+            if stop_config:
+                config["stops"].append(stop_config)
+                print("Stop added.")
+        elif action == "Edit an existing stop":
+            # Placeholder for edit functionality
+            print("Edit functionality not yet implemented.")
+            pass
+        elif action == "Remove a stop":
+            # Placeholder for remove functionality
+            print("Remove functionality not yet implemented.")
+            pass
+        elif action == "Back to main menu":
+            break
+    return config
 
 def build_stop_config(stops_data):
-    """Builds a single stop configuration entry."""
     print("\n--- Adding a new stop configuration ---")
-    
     main_stop = find_stop(stops_data, "Enter the name of the stop to display:")
-    if not main_stop:
-        return None
+    if not main_stop: return None
 
     stop_id = main_stop.get('Didoc Code')
     if not stop_id:
@@ -103,98 +127,96 @@ def build_stop_config(stops_data):
         return None
 
     config_entry = {"ID": stop_id}
-    
     filter_type = questionary.select(
-        f"For '{main_stop.get('Stop')}', do you want to include only specific lines or exclude certain lines?",
+        f"For '{main_stop.get('Stop')}', include or exclude specific lines?",
         choices=["LinesInclude", "LinesExclude"]
     ).ask()
+    if not filter_type: return None
 
-    if not filter_type:
-        return None
-
-    lines_str = questionary.text(
-        "Enter the line numbers to include/exclude (comma-separated, e.g., 10, 22, F):"
-    ).ask()
-    
+    lines_str = questionary.text("Enter line numbers (comma-separated, e.g., 10, 22, F):").ask()
     if not lines_str:
-        print("No lines entered. Skipping this stop configuration.")
+        print("No lines entered. Skipping.")
         return None
 
     lines = [line.strip() for line in lines_str.split(',')]
     lines_dict = {}
-
     for line in lines:
-        add_destination = questionary.confirm(
-            f"For line '{line}', do you want to filter by a specific destination?",
-            default=False
-        ).ask()
-
-        if add_destination:
-            destination_stop = find_stop(stops_data, f"Enter destination for line '{line}':")
-            if destination_stop and destination_stop.get('Didoc Code'):
-                lines_dict[line] = destination_stop.get('Didoc Code')
-            else:
-                print(f"Could not find a valid destination for line '{line}'. It will not be filtered by destination.")
-                lines_dict[line] = None
+        if questionary.confirm(f"For line '{line}', filter by a specific destination?", default=False).ask():
+            dest_stop = find_stop(stops_data, f"Enter destination for line '{line}':")
+            lines_dict[line] = dest_stop.get('Didoc Code') if dest_stop else None
         else:
             lines_dict[line] = None
-
+    
     config_entry[filter_type] = lines_dict
     return config_entry
 
+def manage_settings(config, section_name, settings):
+    print(f"\n--- Configuring {section_name} Settings ---")
+    for key, default_val in settings.items():
+        current_val = config.get(key, default_val)
+        new_val = questionary.text(f"{key} (current: {current_val}):", default=str(current_val)).ask()
+        try:
+            # Attempt to cast to the correct type (int, float, bool)
+            if isinstance(default_val, bool):
+                config[key] = new_val.lower() in ['true', '1', 't', 'y', 'yes']
+            elif isinstance(default_val, int):
+                config[key] = int(new_val)
+            elif isinstance(default_val, float):
+                config[key] = float(new_val)
+            else:
+                config[key] = new_val
+        except (ValueError, TypeError):
+            print(f"Invalid input for {key}. Keeping current value: {current_val}")
+    return config
+
 def main():
-    """Main function to run the config generator."""
     print("Welcome to the Bus Display Config Generator!")
-    
-    stops_data = download_and_parse_stops()
-    
-    final_config = {"stops": []}
-    if os.path.exists(DEFAULT_CONFIG_PATH):
-        load_existing = questionary.confirm(
-            f"An existing config was found at {DEFAULT_CONFIG_PATH}. Do you want to load it and add to it?",
-            default=True
-        ).ask()
-        if load_existing:
-            try:
-                with open(DEFAULT_CONFIG_PATH, 'r') as f:
-                    existing_data = json.load(f)
-                    if "stops" in existing_data and isinstance(existing_data["stops"], list):
-                         final_config = existing_data
-                         print(f"Loaded {len(final_config['stops'])} existing stop configurations.")
-                    else:
-                         print("Existing config is in an unknown format. Starting fresh.")
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Could not read existing config file: {e}. Starting fresh.")
+    config = load_config()
+    stops_data = None # Lazy load stops data
 
     while True:
-        new_stop_config = build_stop_config(stops_data)
-        if new_stop_config:
-            final_config["stops"].append(new_stop_config)
-            print("\n--- Current Configuration ---")
-            print(json.dumps(final_config, indent=2))
-            print("---------------------------\n")
+        print("\n--- Current Configuration ---")
+        print(json.dumps(config, indent=2))
+        print("---------------------------\n")
 
-        add_another = questionary.confirm("Add another stop?").ask()
-        if not add_another:
+        choice = questionary.select(
+            "What would you like to configure?",
+            choices=["Stops", "Layout", "Sizing", "API & Behavior", "Save and Exit", "Exit Without Saving"]
+        ).ask()
+
+        if choice == "Stops":
+            if stops_data is None:
+                stops_data = download_and_parse_stops()
+                if stops_data is None:
+                    print("Could not load stops data. Please check your internet connection.")
+                    continue
+            config = manage_stops(config, stops_data)
+        elif choice == "Layout":
+            config = manage_settings(config, "Layout", {
+                "cols": DEFAULTS["cols"], "rows": DEFAULTS["rows"], "bar_margin": DEFAULTS["bar_margin"],
+                "bar_padding": DEFAULTS["bar_padding"], "card_padding": DEFAULTS["card_padding"],
+                "border_radius": DEFAULTS["border_radius"], "shadow_offset": DEFAULTS["shadow_offset"]
+            })
+        elif choice == "Sizing":
+            config = manage_settings(config, "Sizing", {
+                "cell_w": DEFAULTS["cell_w"], "bar_h": DEFAULTS["bar_h"], "number_size": DEFAULTS["number_size"],
+                "now_size": DEFAULTS["now_size"], "stop_name_size": DEFAULTS["stop_name_size"],
+                "line_size": DEFAULTS["line_size"], "icon_size": DEFAULTS["icon_size"],
+                "scale_multiplier": DEFAULTS["scale_multiplier"]
+            })
+        elif choice == "API & Behavior":
+            config = manage_settings(config, "API & Behavior", {
+                "max_departures": DEFAULTS["max_departures"], "api_request_interval": DEFAULTS["api_request_interval"],
+                "max_minutes": DEFAULTS["max_minutes"], "show_clock": DEFAULTS["show_clock"]
+            })
+        elif choice == "Save and Exit":
+            save_config(config)
             break
-    
-    if not final_config["stops"]:
-        print("No configurations were created. Exiting.")
-        sys.exit(0)
-
-    save_config = questionary.confirm(
-        f"Do you want to save this configuration to {DEFAULT_CONFIG_PATH}?",
-        default=True
-    ).ask()
-
-    if save_config:
-        try:
-            os.makedirs(os.path.dirname(DEFAULT_CONFIG_PATH), exist_ok=True)
-            with open(DEFAULT_CONFIG_PATH, 'w') as f:
-                json.dump(final_config, f, indent=4)
-            print(f"Configuration successfully saved to {DEFAULT_CONFIG_PATH}")
-        except IOError as e:
-            print(f"Error saving configuration file: {e}")
+        elif choice == "Exit Without Saving":
+            if questionary.confirm("Are you sure you want to exit without saving your changes?").ask():
+                break
+        elif choice is None: # User pressed Ctrl+C
+            break
 
 if __name__ == "__main__":
     main()
