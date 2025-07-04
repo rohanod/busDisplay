@@ -20,17 +20,56 @@ curl -fsSL https://raw.githubusercontent.com/rohanod/busDisplay/main/install.sh 
 
 ## Configuration
 
-Edit `~/.config/busdisplay/stops.json` to configure your stops:
+Create `~/.config/busdisplay/config.json` to configure your display:
 
 ```json
-[
-  {"ID": "8592791", "Lines": {"10": "8587061"}},
-  {"ID": "8592855", "Lines": {"22": "8592843"}}
-]
+{
+  "stops": [
+    {"ID": "8592791", "LinesInclude": {"10": "8587061"}},
+    {"ID": "8592855", "LinesExclude": {"22": "8592843", "53": null}},
+    {"ID": "8587061"}
+  ],
+  "max_departures": 8,
+  "api_request_interval": 60,
+  "max_minutes": 120,
+  "show_clock": true
+}
 ```
 
-- `ID`: Stop ID from Search.ch
-- `Lines`: Map of line numbers to terminal IDs you want to display
+### Stop Filtering Options
+- `{"ID": "8592791", "LinesInclude": {"10": "8587061"}}` - Only line 10 to terminal 8587061
+- `{"ID": "8592791", "LinesInclude": {"10": null}}` - Only line 10 to any destination
+- `{"ID": "8592855", "LinesExclude": {"22": "8592843", "53": null}}` - Exclude line 22 to 8592843 and all line 53
+- `{"ID": "8587061"}` - All departures (no filtering)
+
+### Configuration Options
+
+| Option | Description | Default | Example |
+|--------|-------------|---------|----------|
+| `stops` | Array of stop configurations | `[]` | `[{"ID": "8592791"}]` |
+| `max_departures` | Maximum departures per stop | `8` | `6` |
+| `api_request_interval` | Seconds between API calls | `60` | `45` |
+| `max_minutes` | Hide departures beyond X minutes | `120` | `90` |
+| `show_clock` | Show current time in corner | `true` | `false` |
+| `cols` | Maximum departure columns | `8` | `6` |
+| `rows` | Maximum stop rows | `2` | `3` |
+| `cell_w` | Base cell width | `140` | `120` |
+| `bar_h` | Stop card height | `320` | `280` |
+| `bar_margin` | Margin between stop cards | `30` | `20` |
+| `bar_padding` | Padding inside stop cards | `25` | `20` |
+| `card_padding` | Padding between elements | `15` | `10` |
+| `number_size` | Departure time font size | `48` | `42` |
+| `now_size` | "NOW" text font size | `28` | `24` |
+| `stop_name_size` | Stop name font size | `48` | `44` |
+| `line_size` | Line number font size | `36` | `32` |
+| `icon_size` | Clock/tram icon size | `40` | `36` |
+| `border_radius` | Card corner radius | `16` | `12` |
+| `shadow_offset` | Card shadow offset | `6` | `4` |
+
+### Layout Behavior
+- **1-2 stops**: Vertical stack
+- **3 stops**: Two on top, one centered below
+- **4+ stops**: 2x2 grid
 
 ## Service Management
 

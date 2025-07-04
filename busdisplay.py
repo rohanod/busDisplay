@@ -30,7 +30,7 @@ DEFAULT_BAR_MARGIN         = 30
 DEFAULT_BAR_PADDING        = 25
 DEFAULT_CARD_PADDING       = 15
 DEFAULT_NUMBER_SIZE        = 48
-DEFAULT_NOW_SIZE           = 20
+DEFAULT_NOW_SIZE           = 30
 DEFAULT_STOP_NAME_SIZE     = 48
 DEFAULT_LINE_SIZE          = 36
 DEFAULT_ICON_SIZE          = 40
@@ -38,51 +38,42 @@ DEFAULT_BORDER_RADIUS      = 16
 DEFAULT_SHADOW_OFFSET      = 6
 
 # ────────── Runtime Config ──────────
-CFG_PATH = os.path.expanduser("~/.config/busdisplay/stops.json")
-SIZE_CFG_PATH = os.path.expanduser("~/.config/busdisplay/sizes.json")
+CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
 
-if not os.path.isfile(CFG_PATH):
-    log.error(f"Config file not found: {CFG_PATH}")
-    log.error("Please create stops.json with your stop configuration")
+if not os.path.isfile(CONFIG_PATH):
+    log.error(f"Config file not found: {CONFIG_PATH}")
+    log.error("Please create config.json with your configuration")
     sys.exit(1)
 
-with open(CFG_PATH) as f:
-    STOPS = json.load(f)
+with open(CONFIG_PATH) as f:
+    config = json.load(f)
 
-# Load size overrides
-size_overrides = {}
-if os.path.isfile(SIZE_CFG_PATH):
-    with open(SIZE_CFG_PATH) as f:
-        size_overrides = json.load(f)
+STOPS = config.get("stops", [])
+if not STOPS:
+    log.error("No stops configured in config.json")
+    sys.exit(1)
 
-# Apply size overrides
-SCALE_MULTIPLIER = size_overrides.get("scale_multiplier", DEFAULT_SCALE_MULTIPLIER)
-COLS = size_overrides.get("cols", DEFAULT_COLS)
-ROWS = size_overrides.get("rows", DEFAULT_ROWS)
-CELL_W_BASE = size_overrides.get("cell_w", DEFAULT_CELL_W)
-BAR_H_BASE = size_overrides.get("bar_h", DEFAULT_BAR_H)
-BAR_MARGIN_BASE = size_overrides.get("bar_margin", DEFAULT_BAR_MARGIN)
-BAR_PADDING_BASE = size_overrides.get("bar_padding", DEFAULT_BAR_PADDING)
-CARD_PADDING_BASE = size_overrides.get("card_padding", DEFAULT_CARD_PADDING)
-NUMBER_SIZE_BASE = size_overrides.get("number_size", DEFAULT_NUMBER_SIZE)
-NOW_SIZE_BASE = size_overrides.get("now_size", DEFAULT_NOW_SIZE)
-STOP_NAME_SIZE_BASE = size_overrides.get("stop_name_size", DEFAULT_STOP_NAME_SIZE)
-LINE_SIZE_BASE = size_overrides.get("line_size", DEFAULT_LINE_SIZE)
-ICON_SIZE_BASE = size_overrides.get("icon_size", DEFAULT_ICON_SIZE)
-BORDER_RADIUS_BASE = size_overrides.get("border_radius", DEFAULT_BORDER_RADIUS)
-SHADOW_OFFSET_BASE = size_overrides.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
+# Apply all overrides from config
+COLS = config.get("cols", DEFAULT_COLS)
+ROWS = config.get("rows", DEFAULT_ROWS)
+CELL_W_BASE = config.get("cell_w", DEFAULT_CELL_W)
+BAR_H_BASE = config.get("bar_h", DEFAULT_BAR_H)
+BAR_MARGIN_BASE = config.get("bar_margin", DEFAULT_BAR_MARGIN)
+BAR_PADDING_BASE = config.get("bar_padding", DEFAULT_BAR_PADDING)
+CARD_PADDING_BASE = config.get("card_padding", DEFAULT_CARD_PADDING)
+NUMBER_SIZE_BASE = config.get("number_size", DEFAULT_NUMBER_SIZE)
+NOW_SIZE_BASE = config.get("now_size", DEFAULT_NOW_SIZE)
+STOP_NAME_SIZE_BASE = config.get("stop_name_size", DEFAULT_STOP_NAME_SIZE)
+LINE_SIZE_BASE = config.get("line_size", DEFAULT_LINE_SIZE)
+ICON_SIZE_BASE = config.get("icon_size", DEFAULT_ICON_SIZE)
+BORDER_RADIUS_BASE = config.get("border_radius", DEFAULT_BORDER_RADIUS)
+SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
+SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
-# Load config overrides
-CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
-config_overrides = {}
-if os.path.isfile(CONFIG_PATH):
-    with open(CONFIG_PATH) as f:
-        config_overrides = json.load(f)
-
-MAX_SHOW       = config_overrides.get("max_departures", 8)
-POLL_INTERVAL  = config_overrides.get("api_request_interval", 60)
-MAX_MINUTES    = config_overrides.get("max_minutes", 120)
-SHOW_CLOCK     = config_overrides.get("show_clock", True)
+MAX_SHOW       = config.get("max_departures", 8)
+POLL_INTERVAL  = config.get("api_request_interval", 60)
+MAX_MINUTES    = config.get("max_minutes", 120)
+SHOW_CLOCK     = config.get("show_clock", True)
 API_URL        = "https://search.ch/timetable/api/stationboard.fr.json"
 API_LIMIT      = 100
 FETCH_TIMEOUT  = 4
