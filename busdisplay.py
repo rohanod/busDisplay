@@ -123,6 +123,7 @@ def fetch(stop):
                 "stop": stop["ID"],
                 "transportation_types": "bus,tram",
                 "limit": limit,
+                "show_delays": "1",
             },
             timeout=FETCH_TIMEOUT,
         )
@@ -156,6 +157,10 @@ def fetch(stop):
         # No filtering if neither LinesInclude nor LinesExclude
         try:
             ts = datetime.datetime.strptime(c["time"], "%Y-%m-%d %H:%M:%S")
+            # Add delay if present
+            delay_minutes = c.get("delay", 0)
+            if delay_minutes:
+                ts += datetime.timedelta(minutes=delay_minutes)
         except ValueError:
             continue
         delta = round((ts - now).total_seconds() / 60)
