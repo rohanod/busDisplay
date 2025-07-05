@@ -38,6 +38,8 @@ DEFAULT_ICON_SIZE          = 40
 DEFAULT_BORDER_RADIUS      = 16
 DEFAULT_SHADOW_OFFSET      = 6
 DEFAULT_GRID_SHRINK        = 0.7
+DEFAULT_HTTP_TIMEOUT       = 10
+DEFAULT_FETCH_INTERVAL     = 60
 
 # ────────── Runtime Config ──────────
 CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
@@ -75,11 +77,12 @@ SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
 MAX_SHOW       = config.get("max_departures", 8)
 POLL_INTERVAL  = config.get("api_request_interval", 90)
+FETCH_INTERVAL = config.get("fetch_interval", DEFAULT_FETCH_INTERVAL)
 MAX_MINUTES    = config.get("max_minutes", 120)
 SHOW_CLOCK     = config.get("show_clock", True)
+FETCH_TIMEOUT  = config.get("http_timeout", DEFAULT_HTTP_TIMEOUT)
 API_URL        = "https://search.ch/timetable/api/stationboard.fr.json"
 API_LIMIT      = 100
-FETCH_TIMEOUT  = 4
 SPINNER        = "|/-\\"
 
 CLOCK_SVG_FILE = os.path.join(os.path.dirname(__file__), "clock.svg")
@@ -346,11 +349,11 @@ def main():
     tram_img  = _load_svg(TRAM_SVG_FILE, ICON_SIZE, ICON_SIZE)
     
     frame_count = 0
-    last_minute = -1
+    last_fetch = 0
     
     while True:
         now = datetime.datetime.now()
-        current_minute = now.minute
+        current_time = time.time()
         loading = any(r is None for r in results)
         
         # Draw frame
@@ -358,7 +361,7 @@ def main():
             frame = (frame_count // 1) % len(SPINNER)
             frame_count += 1
         else:
-            frame = current_minute % len(SPINNER)
+            frame = int(current_time) % len(SPINNER)
             
         screen.fill(DARK_BG)
         if loading:
@@ -369,8 +372,8 @@ def main():
         else:
             # Show clock if enabled
             if SHOW_CLOCK:
-                current_time = now.strftime("%H:%M")
-                clock_surf = font_clock.render(current_time, True, TEXT_SECONDARY)
+                current_time_str = now.strftime("%H:%M")
+                clock_surf = font_clock.render(current_time_str, True, TEXT_SECONDARY)
                 screen.blit(clock_surf, (20, 20))
             
             positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
@@ -378,9 +381,10 @@ def main():
                 draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
         pygame.display.flip()
         
-        # Fetch every minute
-        if current_minute != last_minute:
-            last_minute = current_minute
+        # Fetch based on interval
+        if current_time >= last_fetch + FETCH_INTERVAL:
+            last_fetch = current_time
+            log.info(f"Fetch interval reached, fetching all {len(STOPS)} stops")
             for i, stop in enumerate(STOPS):
                 results[i] = fetch(stop)
         
