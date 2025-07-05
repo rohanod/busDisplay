@@ -334,9 +334,10 @@ def main():
     screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.NOFRAME)
     pygame.mouse.set_visible(False)
     
-    # ────────── Adaptive Scaling ──────────
-    base_scale = min(info.current_w / 1920, info.current_h / 1080)  # Scale based on 1920x1080 reference
-    scale = max(0.5, min(2.0, base_scale))  # Clamp between 0.5x and 2x
+    # ────────── Scaling ──────────
+    design_w = COLS * CELL_W_BASE * SCALE_MULTIPLIER
+    design_h = ROWS * BAR_H_BASE * SCALE_MULTIPLIER + (ROWS - 1) * BAR_MARGIN_BASE * SCALE_MULTIPLIER
+    scale = min(info.current_w / design_w, info.current_h / design_h)
     
     # Apply grid shrink for 3+ stops
     grid_scale = GRID_SHRINK if rows > 2 else 1.0
