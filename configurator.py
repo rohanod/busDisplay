@@ -94,24 +94,68 @@ def find_stop(stops_data, prompt_text):
 
 def manage_stops(config, stops_data):
     while True:
-        action = questionary.select(
-            "Manage Stops:",
-            choices=["Add a new stop", "Edit an existing stop", "Remove a stop", "Back to main menu"]
-        ).ask()
+        try:
+            action = questionary.select(
+                "Manage Stops:",
+                choices=["Add a new stop", "Edit an existing stop", "Remove a stop", "Back to main menu"]
+            ).ask()
+        except KeyboardInterrupt:
+            break
 
-        if action == "Add a new stop":
+        if action is None:  # ESC pressed
+            break
+        elif action == "Add a new stop":
             stop_config = build_stop_config(stops_data)
             if stop_config:
                 config["stops"].append(stop_config)
                 print("Stop added.")
         elif action == "Edit an existing stop":
-            # Placeholder for edit functionality
-            print("Edit functionality not yet implemented.")
-            pass
+            if not config["stops"]:
+                print("No stops configured to edit.")
+                continue
+            
+            # Show current stops
+            choices = [f"Stop {i+1}: {stop.get('ID', 'Unknown')}" for i, stop in enumerate(config["stops"])]
+            choices.append("Back")
+            
+            try:
+                selected = questionary.select("Select stop to edit:", choices=choices).ask()
+                if selected is None or selected == "Back":
+                    continue
+                
+                stop_index = int(selected.split(":")[0].split()[1]) - 1
+                old_stop = config["stops"][stop_index]
+                
+                print(f"\nEditing: {old_stop}")
+                new_stop = build_stop_config(stops_data)
+                if new_stop:
+                    config["stops"][stop_index] = new_stop
+                    print("Stop updated.")
+            except (KeyboardInterrupt, ValueError, IndexError):
+                continue
+                
         elif action == "Remove a stop":
-            # Placeholder for remove functionality
-            print("Remove functionality not yet implemented.")
-            pass
+            if not config["stops"]:
+                print("No stops configured to remove.")
+                continue
+            
+            # Show current stops
+            choices = [f"Stop {i+1}: {stop.get('ID', 'Unknown')}" for i, stop in enumerate(config["stops"])]
+            choices.append("Back")
+            
+            try:
+                selected = questionary.select("Select stop to remove:", choices=choices).ask()
+                if selected is None or selected == "Back":
+                    continue
+                
+                stop_index = int(selected.split(":")[0].split()[1]) - 1
+                stop_to_remove = config["stops"][stop_index]
+                
+                if questionary.confirm(f"Remove stop {stop_to_remove.get('ID', 'Unknown')}?").ask():
+                    config["stops"].pop(stop_index)
+                    print("Stop removed.")
+            except (KeyboardInterrupt, ValueError, IndexError):
+                continue
         elif action == "Back to main menu":
             break
     return config
@@ -163,8 +207,10 @@ def manage_settings(config, section_name, settings):
     print(f"\n--- Configuring {section_name} Settings ---")
     for key, default_val in settings.items():
         current_val = config.get(key, default_val)
-        new_val = questionary.text(f"{key} (current: {current_val}):", default=str(current_val)).ask()
         try:
+            new_val = questionary.text(f"{key} (current: {current_val}):", default=str(current_val)).ask()
+            if new_val is None:  # ESC pressed
+                break
             # Attempt to cast to the correct type (int, float, bool)
             if isinstance(default_val, bool):
                 config[key] = new_val.lower() in ['true', '1', 't', 'y', 'yes']
@@ -174,6 +220,8 @@ def manage_settings(config, section_name, settings):
                 config[key] = float(new_val)
             else:
                 config[key] = new_val
+        except KeyboardInterrupt:
+            break
         except (ValueError, TypeError):
             print(f"Invalid input for {key}. Keeping current value: {current_val}")
     return config
@@ -190,12 +238,18 @@ def main():
         print(json.dumps(config, indent=2))
         print("---------------------------\n")
 
-        choice = questionary.select(
-            "What would you like to configure?",
-            choices=["Stops", "Layout", "Sizing", "API & Behavior", "Save and Restart", "Save and Exit", "Exit Without Saving"]
-        ).ask()
+        try:
+            choice = questionary.select(
+                "What would you like to configure?",
+                choices=["Stops", "Layout", "Sizing", "API & Behavior", "Save and Restart", "Save and Exit", "Exit Without Saving"]
+            ).ask()
+        except KeyboardInterrupt:
+            print("\nExiting configurator...")
+            break
 
-        if choice == "Stops":
+        if choice is None:  # ESC pressed
+            break
+        elif choice == "Stops":
             if stops_data is None:
                 stops_data = download_and_parse_stops()
                 if stops_data is None:

@@ -121,7 +121,7 @@ bash ~/busdisplay/uninstall.sh
 ## Hardware Requirements
 
 - Raspberry Pi Zero 2 W (or any RPi with HDMI)
-- Raspberry Pi OS Bookworm (Wayland disabled)
+- Raspberry Pi OS Lite
 - HDMI display
 - Internet connection
 
