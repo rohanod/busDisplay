@@ -114,8 +114,29 @@ def _load_svg(path: str, w: int, h: int) -> pygame.Surface:
 
 rows       = len(STOPS)
 results    = [None] * rows
+weather_data = None
 
 # ────────── Networking ──────────
+def fetch_weather():
+    try:
+        resp = requests.get("https://api.open-meteo.com/v1/forecast", params={
+            "latitude": 46.1925,
+            "longitude": 6.17017,
+            "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
+            "timezone": "Europe/Zurich"
+        }, timeout=FETCH_TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+        today = data["daily"]
+        return {
+            "max_temp": today["temperature_2m_max"][0],
+            "min_temp": today["temperature_2m_min"][0],
+            "rain": "Rain" if today["precipitation_sum"][0] > 0 else "No rain"
+        }
+    except Exception:
+        log.error("Weather fetch error", exc_info=True)
+    return None
+
 def fetch(stop):
     limit = stop.get("Limit", API_LIMIT)
     log.info(f"Fetching stop {stop['ID']} with limit {limit}")
@@ -262,11 +283,12 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
 def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
     positions = []
     if num_stops <= 2:
-        # Vertical stack
+        # Vertical stack on right side with adaptive margin
         total_h = num_stops * BAR_H + (num_stops - 1) * BAR_MARGIN
         start_y = (info.current_h - total_h) // 2
+        right_margin = int(info.current_w * 0.05)  # 5% margin from right
         for i in range(num_stops):
-            x = (info.current_w - FIXED_CARD_W) // 2
+            x = info.current_w - FIXED_CARD_W - right_margin
             y = start_y + i * (BAR_H + BAR_MARGIN)
             positions.append((x, y))
     elif num_stops == 3:
@@ -292,7 +314,7 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
 
 # ────────── Main loop ──────────
 def main():
-    global screen, info, font_num, font_now, font_stop, font_line, font_clock, clock_img, tram_img
+    global screen, info, font_num, font_now, font_stop, font_line, font_clock, clock_img, tram_img, weather_data
     
     # ────────── Pygame init ──────────
     log.info(f"DISPLAY environment: {os.environ.get('DISPLAY', 'Not set')}")
@@ -312,10 +334,9 @@ def main():
     screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.NOFRAME)
     pygame.mouse.set_visible(False)
     
-    # ────────── Scaling ──────────
-    design_w = COLS * CELL_W_BASE * SCALE_MULTIPLIER
-    design_h = ROWS * BAR_H_BASE * SCALE_MULTIPLIER + (ROWS - 1) * BAR_MARGIN_BASE * SCALE_MULTIPLIER
-    scale    = min(info.current_w / design_w, info.current_h / design_h)
+    # ────────── Adaptive Scaling ──────────
+    base_scale = min(info.current_w / 1920, info.current_h / 1080)  # Scale based on 1920x1080 reference
+    scale = max(0.5, min(2.0, base_scale))  # Clamp between 0.5x and 2x
     
     # Apply grid shrink for 3+ stops
     grid_scale = GRID_SHRINK if rows > 2 else 1.0
@@ -375,15 +396,40 @@ def main():
             screen.blit(surf, ((info.current_w - surf.get_width())//2,
                                (info.current_h - surf.get_height())//2))
         else:
-            # Show clock if enabled
-            if SHOW_CLOCK:
-                current_time_str = now.strftime("%H:%M:%S")
-                clock_surf = font_clock.render(current_time_str, True, TEXT_SECONDARY)
-                screen.blit(clock_surf, (20, 20))
+            # Show clock and weather on left when 2 or fewer stops
+            if rows <= 2:
+                left_margin = int(info.current_w * 0.05)  # 5% margin from left
+                clock_y = int(info.current_h * 0.15)     # 15% from top
+                weather_y = int(info.current_h * 0.35)   # 35% from top
+                # Show clock
+                if SHOW_CLOCK:
+                    current_time_str = now.strftime("%H:%M:%S")
+                    clock_surf = font_clock.render(current_time_str, True, TEXT_PRIMARY)
+                    screen.blit(clock_surf, (left_margin, clock_y))
+                # Show weather below clock
+                if weather_data:
+                    weather_text = f"{weather_data['rain']}\n{weather_data['min_temp']:.1f}°C - {weather_data['max_temp']:.1f}°C"
+                    for i, line in enumerate(weather_text.split('\n')):
+                        weather_surf = font_clock.render(line, True, TEXT_SECONDARY)
+                        screen.blit(weather_surf, (left_margin, weather_y + i * int(font_clock.get_height() * 1.2)))
+            else:
+                # Show clock in corner for 3+ stops
+                if SHOW_CLOCK:
+                    current_time_str = now.strftime("%H:%M:%S")
+                    clock_surf = font_clock.render(current_time_str, True, TEXT_SECONDARY)
+                    screen.blit(clock_surf, (int(info.current_w * 0.02), int(info.current_h * 0.02)))
             
             positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
             for idx, (x, y) in enumerate(positions[:rows]):
                 draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
+            
+            # Show weather at bottom only for 3+ stops
+            if rows > 2 and weather_data:
+                weather_text = f"{weather_data['rain']} • {weather_data['min_temp']:.1f}°C - {weather_data['max_temp']:.1f}°C"
+                weather_surf = font_clock.render(weather_text, True, TEXT_SECONDARY)
+                weather_x = (info.current_w - weather_surf.get_width()) // 2
+                weather_y = info.current_h - weather_surf.get_height() - int(info.current_h * 0.02)
+                screen.blit(weather_surf, (weather_x, weather_y))
         pygame.display.flip()
         
         # Fetch based on interval
@@ -392,6 +438,9 @@ def main():
             log.info(f"Fetch interval reached, fetching all {len(STOPS)} stops")
             for i, stop in enumerate(STOPS):
                 results[i] = fetch(stop)
+            # Fetch weather data less frequently (every 10 minutes)
+            if weather_data is None or current_time % 600 < FETCH_INTERVAL:
+                weather_data = fetch_weather()
         
         for e in pygame.event.get():
             if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
