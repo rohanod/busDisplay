@@ -218,8 +218,12 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
     # Departure cards
     card_start_x = icon_x + ICON_SIZE + CARD_PADDING
     
-    for i, (_, ln, mn) in enumerate(deps[:cols]):
+    for i, (ts, ln, _) in enumerate(deps[:cols]):
         card_x = card_start_x + i * card_w
+        
+        # Recalculate minutes at display time
+        now = datetime.datetime.now()
+        mn = max(0, round((ts - now).total_seconds() / 60))
         
         # Departure card background
         if mn == 0:
@@ -352,17 +356,15 @@ def main():
         # Check if still loading
         loading = any(r is None for r in results)
         
-        # Update logic: 1fps during loading, 1fpm after loading
+        # Update logic: 1fps during loading, every frame after loading
         should_update = False
         if loading:
             # 1fps during loading
             should_update = True
             frame_count += 1
         else:
-            # 1 frame per minute after loading
-            if current_minute != last_minute:
-                last_minute = current_minute
-                should_update = True
+            # Update every frame after loading
+            should_update = True
         
         if should_update:
             if loading:
@@ -407,7 +409,10 @@ def main():
         if loading:
             time.sleep(1/24)  # 24fps during loading
         else:
-            time.sleep(1)  # Check every second for minute changes
+            # Sleep until next minute boundary after loading
+            now = datetime.datetime.now()
+            seconds_to_next_minute = 60 - now.second - now.microsecond / 1000000
+            time.sleep(seconds_to_next_minute)
 
 if __name__ == "__main__":
     try:
