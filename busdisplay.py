@@ -354,7 +354,7 @@ def main():
     while True:
         now = datetime.datetime.now()
         current_time = time.time()
-        loading = any(r is None or (r[1] and len(r[1]) == 0) for r in results)
+        loading = any(r is None or (r and len(r[1]) == 0) for r in results)
         
         # Draw frame
         if loading:
