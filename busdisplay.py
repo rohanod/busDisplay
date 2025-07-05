@@ -350,16 +350,14 @@ def main():
     
     frame_count = 0
     last_fetch = 0
-    loading_start_time = 0
+    loading_start_time = time.time()  # Start loading immediately
     
     while True:
         now = datetime.datetime.now()
         current_time = time.time()
         # Force loading state for at least 3 seconds to show spinner
         data_loading = any(r is None for r in results)
-        if data_loading and loading_start_time == 0:
-            loading_start_time = current_time
-        loading = data_loading or (loading_start_time > 0 and current_time - loading_start_time < 3)
+        loading = data_loading or (current_time - loading_start_time < 3)
         if not data_loading and current_time - loading_start_time >= 3:
             loading_start_time = 0
         
