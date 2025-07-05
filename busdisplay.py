@@ -358,7 +358,7 @@ def main():
         
         # Draw frame
         if loading:
-            frame = (frame_count // 1) % len(SPINNER)
+            frame = (frame_count // 3) % len(SPINNER)
             frame_count += 1
         else:
             frame = int(current_time) % len(SPINNER)
@@ -392,7 +392,7 @@ def main():
             if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                 pygame.quit(); sys.exit(0)
         
-        time.sleep(1)  # 1fps
+        time.sleep(0.1 if loading else 0.5)  # 10fps loading, 2fps normal
 
 if __name__ == "__main__":
     try:
