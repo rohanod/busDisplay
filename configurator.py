@@ -8,17 +8,83 @@ import os
 import sys
 import unicodedata
 
+# Import defaults from busdisplay.py
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from busdisplay import (
+        DEFAULT_COLS, DEFAULT_ROWS, DEFAULT_CELL_W, DEFAULT_BAR_H, DEFAULT_BAR_MARGIN,
+        DEFAULT_BAR_PADDING, DEFAULT_CARD_PADDING, DEFAULT_MINUTE_SIZE, DEFAULT_NOW_SIZE,
+        DEFAULT_STOP_NAME_SIZE, DEFAULT_LINE_SIZE, DEFAULT_ICON_SIZE, DEFAULT_BORDER_RADIUS,
+        DEFAULT_SHADOW_OFFSET, DEFAULT_GRID_SHRINK, DEFAULT_HTTP_TIMEOUT, DEFAULT_FETCH_INTERVAL
+    )
+except ImportError as e:
+    print(f"Error importing defaults from busdisplay.py: {e}")
+    print("Using fallback defaults...")
+    DEFAULT_COLS = 8
+    DEFAULT_ROWS = 2
+    DEFAULT_CELL_W = 140
+    DEFAULT_BAR_H = 320
+    DEFAULT_BAR_MARGIN = 30
+    DEFAULT_BAR_PADDING = 25
+    DEFAULT_CARD_PADDING = 15
+    DEFAULT_MINUTE_SIZE = 48
+    DEFAULT_NOW_SIZE = 30
+    DEFAULT_STOP_NAME_SIZE = 48
+    DEFAULT_LINE_SIZE = 36
+    DEFAULT_ICON_SIZE = 40
+    DEFAULT_BORDER_RADIUS = 16
+    DEFAULT_SHADOW_OFFSET = 6
+    DEFAULT_GRID_SHRINK = 0.8
+    DEFAULT_HTTP_TIMEOUT = 10
+    DEFAULT_FETCH_INTERVAL = 60
+
 ARRETS_CSV_URL = "https://raw.githubusercontent.com/rohanod/arrets/refs/heads/main/arrets.csv"
 DEFAULT_CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
 
 # Default values from busdisplay.py
 DEFAULTS = {
     "stops": [],
-    "cols": 8, "rows": 2, "cell_w": 140, "bar_h": 320, "bar_margin": 30,
-    "bar_padding": 25, "card_padding": 15, "number_size": 48, "now_size": 30,
-    "stop_name_size": 48, "line_size": 36, "icon_size": 40, "border_radius": 16,
-    "shadow_offset": 6, "scale_multiplier": 1.0, "max_departures": 8,
-    "api_request_interval": 60, "max_minutes": 120, "show_clock": True
+    "cols": DEFAULT_COLS, "rows": DEFAULT_ROWS, "cell_w": DEFAULT_CELL_W, 
+    "bar_h": DEFAULT_BAR_H, "bar_margin": DEFAULT_BAR_MARGIN,
+    "bar_padding": DEFAULT_BAR_PADDING, "card_padding": DEFAULT_CARD_PADDING, 
+    "minute_size": DEFAULT_MINUTE_SIZE, "now_size": DEFAULT_NOW_SIZE,
+    "stop_name_size": DEFAULT_STOP_NAME_SIZE, "line_size": DEFAULT_LINE_SIZE, 
+    "icon_size": DEFAULT_ICON_SIZE, "border_radius": DEFAULT_BORDER_RADIUS,
+    "shadow_offset": DEFAULT_SHADOW_OFFSET, "grid_shrink": DEFAULT_GRID_SHRINK, 
+    "max_departures": 8, "api_request_interval": 60, "fetch_interval": DEFAULT_FETCH_INTERVAL, 
+    "http_timeout": DEFAULT_HTTP_TIMEOUT, "max_minutes": 120, "show_clock": True
+}
+
+# Config option descriptions for better UX
+CONFIG_DESCRIPTIONS = {
+    "cols": "Maximum departure columns",
+    "rows": "Maximum stop rows", 
+    "cell_w": "Base cell width",
+    "bar_h": "Stop card height",
+    "bar_margin": "Margin between stop cards",
+    "bar_padding": "Padding inside stop cards",
+    "card_padding": "Padding between elements",
+    "minute_size": "Departure time font size",
+    "now_size": "NOW text font size",
+    "stop_name_size": "Stop name font size",
+    "line_size": "Line number font size",
+    "icon_size": "Clock/tram icon size",
+    "border_radius": "Card corner radius",
+    "shadow_offset": "Card shadow offset",
+    "grid_shrink": "Shrink multiplier for 3+ stops",
+    "max_departures": "Maximum departures per stop",
+    "api_request_interval": "Seconds between API calls (legacy)",
+    "fetch_interval": "Seconds between data fetches",
+    "http_timeout": "HTTP request timeout in seconds",
+    "max_minutes": "Hide departures beyond X minutes",
+    "show_clock": "Show current time in corner"
+}
+
+# Categories for organized configuration
+CATEGORIES = {
+    "Layout": ["cols", "rows", "bar_margin", "bar_padding", "card_padding", "border_radius", "shadow_offset"],
+    "Sizing": ["cell_w", "bar_h", "minute_size", "now_size", "stop_name_size", "line_size", "icon_size", "grid_shrink"],
+    "API & Behavior": ["max_departures", "api_request_interval", "fetch_interval", "http_timeout", "max_minutes", "show_clock"]
 }
 
 def load_config():
@@ -216,27 +282,85 @@ def build_stop_config(stops_data):
     
     return config_entry
 
-def manage_settings(config, section_name, settings):
-    print(f"\n--- Configuring {section_name} Settings ---")
-    for key, default_val in settings.items():
-        current_val = config.get(key, default_val)
+def fuzzy_search_config(query, config_keys):
+    """Simple fuzzy search for config keys"""
+    query = query.lower()
+    matches = []
+    for key in config_keys:
+        key_lower = key.lower()
+        desc_lower = CONFIG_DESCRIPTIONS.get(key, "").lower()
+        if query in key_lower or query in desc_lower:
+            matches.append(key)
+    return matches
+
+def configure_single_option(config, key):
+    """Configure a single config option"""
+    default_val = DEFAULTS.get(key, "")
+    current_val = config.get(key, default_val)
+    description = CONFIG_DESCRIPTIONS.get(key, "")
+    
+    prompt = f"{key}"
+    if description:
+        prompt += f" ({description})"
+    prompt += f" [current: {current_val}]:"
+    
+    try:
+        new_val = questionary.text(prompt, default=str(current_val)).ask()
+        if new_val is None:  # ESC pressed
+            return config
+        
+        # Cast to correct type
+        if isinstance(default_val, bool):
+            config[key] = new_val.lower() in ['true', '1', 't', 'y', 'yes']
+        elif isinstance(default_val, int):
+            config[key] = int(new_val)
+        elif isinstance(default_val, float):
+            config[key] = float(new_val)
+        else:
+            config[key] = new_val
+        print(f"Updated {key} to {config[key]}")
+    except KeyboardInterrupt:
+        pass
+    except (ValueError, TypeError):
+        print(f"Invalid input for {key}. Keeping current value: {current_val}")
+    return config
+
+def manage_category_settings(config, category_name, category_keys):
+    """Manage settings within a specific category"""
+    while True:
         try:
-            new_val = questionary.text(f"{key} (current: {current_val}):", default=str(current_val)).ask()
-            if new_val is None:  # ESC pressed
+            search_query = questionary.text(f"Search {category_name} option (or press Enter to see all):").ask()
+            if search_query is None:  # ESC pressed
                 break
-            # Attempt to cast to the correct type (int, float, bool)
-            if isinstance(default_val, bool):
-                config[key] = new_val.lower() in ['true', '1', 't', 'y', 'yes']
-            elif isinstance(default_val, int):
-                config[key] = int(new_val)
-            elif isinstance(default_val, float):
-                config[key] = float(new_val)
+            
+            if search_query.strip():
+                matches = fuzzy_search_config(search_query, category_keys)
+                if not matches:
+                    print(f"No {category_name.lower()} options found matching '{search_query}'")
+                    continue
+                available_keys = matches
             else:
-                config[key] = new_val
+                available_keys = category_keys
+            
+            # Create choices with descriptions
+            choices = []
+            for key in available_keys:
+                desc = CONFIG_DESCRIPTIONS.get(key, "")
+                current_val = config.get(key, DEFAULTS.get(key, ""))
+                choice_text = f"{key}: {desc} [current: {current_val}]"
+                choices.append(choice_text)
+            choices.append("Back to main menu")
+            
+            selected = questionary.select(f"Select {category_name.lower()} option to configure:", choices=choices).ask()
+            if selected is None or selected == "Back to main menu":
+                break
+            
+            # Extract key from choice text
+            selected_key = selected.split(":")[0]
+            config = configure_single_option(config, selected_key)
+            
         except KeyboardInterrupt:
             break
-        except (ValueError, TypeError):
-            print(f"Invalid input for {key}. Keeping current value: {current_val}")
     return config
 
 import subprocess
@@ -254,7 +378,7 @@ def main():
         try:
             choice = questionary.select(
                 "What would you like to configure?",
-                choices=["Stops", "Layout", "Sizing", "API & Behavior", "Save and Restart", "Save and Exit", "Exit Without Saving"]
+                choices=["Manage Stops", "Layout", "Sizing", "API & Behavior", "Save and Restart", "Save and Exit", "Exit Without Saving"]
             ).ask()
         except KeyboardInterrupt:
             print("\nExiting configurator...")
@@ -262,31 +386,15 @@ def main():
 
         if choice is None:  # ESC pressed
             break
-        elif choice == "Stops":
+        elif choice == "Manage Stops":
             if stops_data is None:
                 stops_data = download_and_parse_stops()
                 if stops_data is None:
                     print("Could not load stops data. Please check your internet connection.")
                     continue
             config = manage_stops(config, stops_data)
-        elif choice == "Layout":
-            config = manage_settings(config, "Layout", {
-                "cols": DEFAULTS["cols"], "rows": DEFAULTS["rows"], "bar_margin": DEFAULTS["bar_margin"],
-                "bar_padding": DEFAULTS["bar_padding"], "card_padding": DEFAULTS["card_padding"],
-                "border_radius": DEFAULTS["border_radius"], "shadow_offset": DEFAULTS["shadow_offset"]
-            })
-        elif choice == "Sizing":
-            config = manage_settings(config, "Sizing", {
-                "cell_w": DEFAULTS["cell_w"], "bar_h": DEFAULTS["bar_h"], "minute_size": 48,
-                "now_size": DEFAULTS["now_size"], "stop_name_size": DEFAULTS["stop_name_size"],
-                "line_size": DEFAULTS["line_size"], "icon_size": DEFAULTS["icon_size"],
-                "grid_shrink": 0.8
-            })
-        elif choice == "API & Behavior":
-            config = manage_settings(config, "API & Behavior", {
-                "max_departures": DEFAULTS["max_departures"], "api_request_interval": DEFAULTS["api_request_interval"],
-                "max_minutes": DEFAULTS["max_minutes"], "show_clock": DEFAULTS["show_clock"]
-            })
+        elif choice in CATEGORIES:
+            config = manage_category_settings(config, choice, CATEGORIES[choice])
         elif choice == "Save and Restart":
             save_config(config)
             if questionary.confirm("Do you want to restart the bus display service now?").ask():
