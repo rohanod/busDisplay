@@ -347,72 +347,48 @@ def main():
     
     frame_count = 0
     last_minute = -1
-    loading = True
     
     while True:
         now = datetime.datetime.now()
         current_minute = now.minute
-        
-        # Check if still loading
         loading = any(r is None for r in results)
         
-        # Update logic: 1fps during loading, every frame after loading
-        should_update = False
+        # Draw frame
         if loading:
-            # 1fps during loading
-            should_update = True
+            frame = (frame_count // 1) % len(SPINNER)
             frame_count += 1
         else:
-            # Update every frame after loading
-            should_update = True
+            frame = current_minute % len(SPINNER)
+            
+        screen.fill(DARK_BG)
+        if loading:
+            msg  = f"Loading {SPINNER[frame]}"
+            surf = font_minute.render(msg, True, ACCENT_COLOR)
+            screen.blit(surf, ((info.current_w - surf.get_width())//2,
+                               (info.current_h - surf.get_height())//2))
+        else:
+            # Show clock if enabled
+            if SHOW_CLOCK:
+                current_time = now.strftime("%H:%M")
+                clock_surf = font_clock.render(current_time, True, TEXT_SECONDARY)
+                screen.blit(clock_surf, (20, 20))
+            
+            positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
+            for idx, (x, y) in enumerate(positions[:rows]):
+                draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
+        pygame.display.flip()
         
-        if should_update:
-            if loading:
-                frame = (frame_count // 30) % len(SPINNER)  # Change spinner every 30 frames
-            else:
-                frame = current_minute % len(SPINNER)
-                
-            screen.fill(DARK_BG)
-
-            if loading:
-                msg  = f"Loading {SPINNER[frame]}"
-                surf = font_minute.render(msg, True, ACCENT_COLOR)
-                screen.blit(surf, ((info.current_w - surf.get_width())//2,
-                                   (info.current_h - surf.get_height())//2))
-            else:
-                # Show clock if enabled
-                if SHOW_CLOCK:
-                    current_time = now.strftime("%H:%M")
-                    clock_surf = font_clock.render(current_time, True, TEXT_SECONDARY)
-                    screen.blit(clock_surf, (20, 20))
-                
-                positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
-                for idx, (x, y) in enumerate(positions[:rows]):
-                    draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
-
-            pygame.display.flip()
-
-        # fetch every minute
-        if loading or current_minute != last_minute:
-            current_time = time.time()
+        # Fetch every minute
+        if current_minute != last_minute:
+            last_minute = current_minute
             for i, stop in enumerate(STOPS):
-                if current_time >= next_poll[i]:
-                    next_poll[i] = current_time + POLL_INTERVAL
-                    results[i] = fetch(stop)
-                    break
-
+                results[i] = fetch(stop)
+        
         for e in pygame.event.get():
             if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                 pygame.quit(); sys.exit(0)
-
-        # Sleep based on loading state
-        if loading:
-            time.sleep(1/24)  # 24fps during loading
-        else:
-            # Sleep until next minute boundary after loading
-            now = datetime.datetime.now()
-            seconds_to_next_minute = 60 - now.second - now.microsecond / 1000000
-            time.sleep(seconds_to_next_minute)
+        
+        time.sleep(1)  # 1fps
 
 if __name__ == "__main__":
     try:
