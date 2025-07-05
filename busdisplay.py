@@ -372,7 +372,7 @@ def main():
         else:
             # Show clock if enabled
             if SHOW_CLOCK:
-                current_time_str = now.strftime("%H:%M")
+                current_time_str = now.strftime("%H:%M:%S")
                 clock_surf = font_clock.render(current_time_str, True, TEXT_SECONDARY)
                 screen.blit(clock_surf, (20, 20))
             

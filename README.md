@@ -65,7 +65,7 @@ If you prefer to edit the file by hand, create `~/.config/busdisplay/config.json
 | `fetch_interval` | Seconds between data fetches | `60` | `30` |
 | `http_timeout` | HTTP request timeout in seconds | `10` | `15` |
 | `max_minutes` | Hide departures beyond X minutes | `120` | `90` |
-| `show_clock` | Show current time in corner | `true` | `false` |
+| `show_clock` | Show current time (HH:MM:SS) in corner | `true` | `false` |
 | `cols` | Maximum departure columns | `8` | `6` |
 | `rows` | Maximum stop rows | `2` | `3` |
 | `cell_w` | Base cell width | `140` | `120` |
