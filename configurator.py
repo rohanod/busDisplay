@@ -190,13 +190,7 @@ def manage_stops(config, stops_data):
                     continue
                 
                 stop_index = int(selected.split(":")[0].split()[1]) - 1
-                old_stop = config["stops"][stop_index]
-                
-                print(f"\nEditing: {old_stop}")
-                new_stop = build_stop_config(stops_data)
-                if new_stop:
-                    config["stops"][stop_index] = new_stop
-                    print("Stop updated.")
+                config["stops"][stop_index] = edit_stop_config(config["stops"][stop_index], stops_data)
             except (KeyboardInterrupt, ValueError, IndexError):
                 continue
                 
@@ -229,6 +223,127 @@ def manage_stops(config, stops_data):
         elif action == "Back to main menu":
             break
     return config
+
+def edit_stop_config(stop_config, stops_data):
+    """Edit specific parts of a stop configuration"""
+    while True:
+        try:
+            stop_name = get_stop_name_by_id(stops_data, stop_config.get('ID', 'Unknown'))
+            print(f"\nEditing stop: {stop_name} ({stop_config.get('ID', 'Unknown')})")
+            print(f"Current config: {json.dumps(stop_config, indent=2)}")
+            
+            choices = ["Change stop ID", "Edit line filters", "Change API limit", "Done editing"]
+            action = questionary.select("What would you like to edit?", choices=choices).ask()
+            
+            if action is None or action == "Done editing":
+                break
+            elif action == "Change stop ID":
+                new_stop = find_stop(stops_data, "Enter new stop name:")
+                if new_stop:
+                    stop_config["ID"] = new_stop.get('Didoc Code')
+                    print(f"Stop ID changed to {stop_config['ID']}")
+            elif action == "Edit line filters":
+                edit_line_filters(stop_config, stops_data)
+            elif action == "Change API limit":
+                current_limit = stop_config.get("Limit", 100)
+                new_limit = questionary.text(f"Enter API limit [current: {current_limit}]:", default=str(current_limit)).ask()
+                if new_limit:
+                    try:
+                        stop_config["Limit"] = int(new_limit)
+                        print(f"API limit changed to {stop_config['Limit']}")
+                    except ValueError:
+                        print("Invalid limit value.")
+        except KeyboardInterrupt:
+            break
+    return stop_config
+
+def edit_line_filters(stop_config, stops_data):
+    """Edit line include/exclude filters"""
+    while True:
+        try:
+            has_include = "LinesInclude" in stop_config
+            has_exclude = "LinesExclude" in stop_config
+            
+            choices = []
+            if has_include:
+                choices.append("Edit LinesInclude")
+                choices.append("Remove LinesInclude")
+            if has_exclude:
+                choices.append("Edit LinesExclude")
+                choices.append("Remove LinesExclude")
+            if not has_include:
+                choices.append("Add LinesInclude")
+            if not has_exclude:
+                choices.append("Add LinesExclude")
+            choices.append("Done with filters")
+            
+            action = questionary.select("Line filter options:", choices=choices).ask()
+            if action is None or action == "Done with filters":
+                break
+            elif action == "Edit LinesInclude":
+                edit_lines_dict(stop_config, "LinesInclude", stops_data)
+            elif action == "Edit LinesExclude":
+                edit_lines_dict(stop_config, "LinesExclude", stops_data)
+            elif action == "Add LinesInclude":
+                stop_config["LinesInclude"] = {}
+                edit_lines_dict(stop_config, "LinesInclude", stops_data)
+            elif action == "Add LinesExclude":
+                stop_config["LinesExclude"] = {}
+                edit_lines_dict(stop_config, "LinesExclude", stops_data)
+            elif action == "Remove LinesInclude":
+                del stop_config["LinesInclude"]
+                print("LinesInclude removed")
+            elif action == "Remove LinesExclude":
+                del stop_config["LinesExclude"]
+                print("LinesExclude removed")
+        except KeyboardInterrupt:
+            break
+
+def edit_lines_dict(stop_config, filter_type, stops_data):
+    """Edit the lines dictionary for include/exclude filters"""
+    lines_dict = stop_config.get(filter_type, {})
+    
+    while True:
+        try:
+            print(f"\nCurrent {filter_type}: {json.dumps(lines_dict, indent=2)}")
+            choices = ["Add line", "Edit line destination", "Remove line", "Done"]
+            action = questionary.select(f"Edit {filter_type}:", choices=choices).ask()
+            
+            if action is None or action == "Done":
+                break
+            elif action == "Add line":
+                line = questionary.text("Enter line number:").ask()
+                if line:
+                    if questionary.confirm(f"Filter line '{line}' by destination?", default=False).ask():
+                        dest_stop = find_stop(stops_data, f"Enter destination for line '{line}':")
+                        lines_dict[line] = dest_stop.get('Didoc Code') if dest_stop else None
+                    else:
+                        lines_dict[line] = None
+            elif action == "Edit line destination":
+                if not lines_dict:
+                    print("No lines to edit")
+                    continue
+                line_choices = list(lines_dict.keys()) + ["Back"]
+                selected_line = questionary.select("Select line to edit:", choices=line_choices).ask()
+                if selected_line and selected_line != "Back":
+                    if questionary.confirm(f"Filter line '{selected_line}' by destination?", default=bool(lines_dict[selected_line])).ask():
+                        dest_stop = find_stop(stops_data, f"Enter destination for line '{selected_line}':")
+                        lines_dict[selected_line] = dest_stop.get('Didoc Code') if dest_stop else None
+                    else:
+                        lines_dict[selected_line] = None
+            elif action == "Remove line":
+                if not lines_dict:
+                    print("No lines to remove")
+                    continue
+                line_choices = list(lines_dict.keys()) + ["Back"]
+                selected_line = questionary.select("Select line to remove:", choices=line_choices).ask()
+                if selected_line and selected_line != "Back":
+                    del lines_dict[selected_line]
+                    print(f"Line '{selected_line}' removed")
+        except KeyboardInterrupt:
+            break
+    
+    stop_config[filter_type] = lines_dict
 
 def build_stop_config(stops_data):
     print("\n--- Adding a new stop configuration ---")
