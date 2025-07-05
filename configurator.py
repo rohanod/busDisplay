@@ -49,10 +49,11 @@ DEFAULTS = {
     "bar_padding": DEFAULT_BAR_PADDING, "card_padding": DEFAULT_CARD_PADDING, 
     "minute_size": DEFAULT_MINUTE_SIZE, "now_size": DEFAULT_NOW_SIZE,
     "stop_name_size": DEFAULT_STOP_NAME_SIZE, "line_size": DEFAULT_LINE_SIZE, 
-    "icon_size": DEFAULT_ICON_SIZE, "border_radius": DEFAULT_BORDER_RADIUS,
-    "shadow_offset": DEFAULT_SHADOW_OFFSET, "grid_shrink": DEFAULT_GRID_SHRINK, 
-    "max_departures": 8, "api_request_interval": 60, "fetch_interval": DEFAULT_FETCH_INTERVAL, 
-    "http_timeout": DEFAULT_HTTP_TIMEOUT, "max_minutes": 120, "show_clock": True
+    "icon_size": DEFAULT_ICON_SIZE, "icon_line_multiplier": DEFAULT_ICON_LINE_MULTIPLIER,
+    "border_radius": DEFAULT_BORDER_RADIUS, "shadow_offset": DEFAULT_SHADOW_OFFSET, 
+    "grid_shrink": DEFAULT_GRID_SHRINK, "max_departures": 8, 
+    "fetch_interval": DEFAULT_FETCH_INTERVAL, "http_timeout": DEFAULT_HTTP_TIMEOUT, 
+    "max_minutes": 120, "show_clock": True
 }
 
 # Config option descriptions for better UX
@@ -69,11 +70,11 @@ CONFIG_DESCRIPTIONS = {
     "stop_name_size": "Stop name font size",
     "line_size": "Line number font size",
     "icon_size": "Clock/tram icon size",
+    "icon_line_multiplier": "Icon line thickness multiplier",
     "border_radius": "Card corner radius",
     "shadow_offset": "Card shadow offset",
     "grid_shrink": "Shrink multiplier for 3+ stops",
     "max_departures": "Maximum departures per stop",
-    "api_request_interval": "Seconds between API calls (legacy)",
     "fetch_interval": "Seconds between data fetches",
     "http_timeout": "HTTP request timeout in seconds",
     "max_minutes": "Hide departures beyond X minutes",
@@ -83,8 +84,8 @@ CONFIG_DESCRIPTIONS = {
 # Categories for organized configuration
 CATEGORIES = {
     "Layout": ["cols", "rows", "bar_margin", "bar_padding", "card_padding", "border_radius", "shadow_offset"],
-    "Sizing": ["cell_w", "bar_h", "minute_size", "now_size", "stop_name_size", "line_size", "icon_size", "grid_shrink"],
-    "API & Behavior": ["max_departures", "api_request_interval", "fetch_interval", "http_timeout", "max_minutes", "show_clock"]
+    "Sizing": ["cell_w", "bar_h", "minute_size", "now_size", "stop_name_size", "line_size", "icon_size", "icon_line_multiplier", "grid_shrink"],
+    "API & Behavior": ["max_departures", "fetch_interval", "http_timeout", "max_minutes", "show_clock"]
 }
 
 def load_config():

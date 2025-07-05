@@ -62,7 +62,8 @@ If you prefer to edit the file by hand, create `~/.config/busdisplay/config.json
 |--------|-------------|---------|----------|
 | `stops` | Array of stop configurations | `[]` | `[{"ID": "8592791"}]` |
 | `max_departures` | Maximum departures per stop | `8` | `6` |
-| `api_request_interval` | Seconds between API calls | `90` | `60` |
+| `fetch_interval` | Seconds between data fetches | `60` | `30` |
+| `http_timeout` | HTTP request timeout in seconds | `10` | `15` |
 | `max_minutes` | Hide departures beyond X minutes | `120` | `90` |
 | `show_clock` | Show current time in corner | `true` | `false` |
 | `cols` | Maximum departure columns | `8` | `6` |
@@ -77,6 +78,7 @@ If you prefer to edit the file by hand, create `~/.config/busdisplay/config.json
 | `stop_name_size` | Stop name font size | `48` | `44` |
 | `line_size` | Line number font size | `36` | `32` |
 | `icon_size` | Clock/tram icon size | `40` | `36` |
+| `icon_line_multiplier` | Icon line thickness multiplier | `1.0` | `0.5` |
 | `border_radius` | Card corner radius | `16` | `12` |
 | `shadow_offset` | Card shadow offset | `6` | `4` |
 | `grid_shrink` | Shrink multiplier for 3+ stops | `0.8` | `0.7` |

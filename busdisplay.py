@@ -34,10 +34,11 @@ DEFAULT_MINUTE_SIZE        = 48
 DEFAULT_NOW_SIZE           = 30
 DEFAULT_STOP_NAME_SIZE     = 48
 DEFAULT_LINE_SIZE          = 40
-DEFAULT_ICON_SIZE          = 45
+DEFAULT_ICON_SIZE          = 60
 DEFAULT_BORDER_RADIUS      = 16
 DEFAULT_SHADOW_OFFSET      = 6
 DEFAULT_GRID_SHRINK        = 0.7
+DEFAULT_ICON_LINE_MULTIPLIER = 1.0
 DEFAULT_HTTP_TIMEOUT       = 10
 DEFAULT_FETCH_INTERVAL     = 60
 
@@ -70,13 +71,13 @@ NOW_SIZE_BASE = config.get("now_size", DEFAULT_NOW_SIZE)
 STOP_NAME_SIZE_BASE = config.get("stop_name_size", DEFAULT_STOP_NAME_SIZE)
 LINE_SIZE_BASE = config.get("line_size", DEFAULT_LINE_SIZE)
 ICON_SIZE_BASE = config.get("icon_size", DEFAULT_ICON_SIZE)
+ICON_LINE_MULTIPLIER = config.get("icon_line_multiplier", DEFAULT_ICON_LINE_MULTIPLIER)
 BORDER_RADIUS_BASE = config.get("border_radius", DEFAULT_BORDER_RADIUS)
 SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
 GRID_SHRINK = config.get("grid_shrink", DEFAULT_GRID_SHRINK)
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
 MAX_SHOW       = config.get("max_departures", 8)
-POLL_INTERVAL  = config.get("api_request_interval", 90)
 FETCH_INTERVAL = config.get("fetch_interval", DEFAULT_FETCH_INTERVAL)
 MAX_MINUTES    = config.get("max_minutes", 120)
 SHOW_CLOCK     = config.get("show_clock", True)
@@ -113,7 +114,6 @@ def _load_svg(path: str, w: int, h: int) -> pygame.Surface:
 
 rows       = len(STOPS)
 results    = [None] * rows
-next_poll  = [0]    * rows
 
 # ────────── Networking ──────────
 def fetch(stop):
