@@ -115,8 +115,9 @@ next_poll  = [0]    * rows
 # ────────── Networking ──────────
 def fetch(stop):
     limit = stop.get("Limit", API_LIMIT)
+    log.info(f"Fetching stop {stop['ID']} with limit {limit}")
     try:
-        data = requests.get(
+        response = requests.get(
             API_URL,
             params={
                 "stop": stop["ID"],
@@ -124,7 +125,9 @@ def fetch(stop):
                 "limit": limit,
             },
             timeout=FETCH_TIMEOUT,
-        ).json()
+        )
+        log.info(f"HTTP {response.status_code} for stop {stop['ID']} ({len(response.content)} bytes)")
+        data = response.json()
     except Exception:
         log.error("Fetch error", exc_info=True)
         return "?", []

@@ -59,6 +59,12 @@ def download_and_parse_stops():
 def normalize_str(s):
     return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
 
+def get_stop_name_by_id(stops_data, stop_id):
+    for stop in stops_data:
+        if stop.get('Didoc Code') == stop_id:
+            return stop.get('Stop', 'Unknown')
+    return 'Unknown'
+
 def find_stop(stops_data, prompt_text):
     while True:
         try:
@@ -114,8 +120,11 @@ def manage_stops(config, stops_data):
                 print("No stops configured to edit.")
                 continue
             
-            # Show current stops
-            choices = [f"Stop {i+1}: {stop.get('ID', 'Unknown')}" for i, stop in enumerate(config["stops"])]
+            # Show current stops with names
+            choices = []
+            for i, stop in enumerate(config["stops"]):
+                stop_name = get_stop_name_by_id(stops_data, stop.get('ID', 'Unknown'))
+                choices.append(f"Stop {i+1}: {stop_name} ({stop.get('ID', 'Unknown')})")
             choices.append("Back")
             
             try:
@@ -139,8 +148,11 @@ def manage_stops(config, stops_data):
                 print("No stops configured to remove.")
                 continue
             
-            # Show current stops
-            choices = [f"Stop {i+1}: {stop.get('ID', 'Unknown')}" for i, stop in enumerate(config["stops"])]
+            # Show current stops with names
+            choices = []
+            for i, stop in enumerate(config["stops"]):
+                stop_name = get_stop_name_by_id(stops_data, stop.get('ID', 'Unknown'))
+                choices.append(f"Stop {i+1}: {stop_name} ({stop.get('ID', 'Unknown')})")
             choices.append("Back")
             
             try:
@@ -151,7 +163,8 @@ def manage_stops(config, stops_data):
                 stop_index = int(selected.split(":")[0].split()[1]) - 1
                 stop_to_remove = config["stops"][stop_index]
                 
-                if questionary.confirm(f"Remove stop {stop_to_remove.get('ID', 'Unknown')}?").ask():
+                stop_name = get_stop_name_by_id(stops_data, stop_to_remove.get('ID', 'Unknown'))
+                if questionary.confirm(f"Remove stop {stop_name} ({stop_to_remove.get('ID', 'Unknown')})?").ask():
                     config["stops"].pop(stop_index)
                     print("Stop removed.")
             except (KeyboardInterrupt, ValueError, IndexError):
