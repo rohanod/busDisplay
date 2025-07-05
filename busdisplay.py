@@ -282,8 +282,14 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
 
 def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
     positions = []
-    if num_stops <= 2:
-        # Vertical stack on right side with adaptive margin
+    if num_stops == 1:
+        # Single stop at top with padding
+        padding = int(info.current_h * 0.1)  # 10% padding from top
+        x = (info.current_w - FIXED_CARD_W) // 2
+        y = padding
+        positions.append((x, y))
+    elif num_stops == 2:
+        # Two stops on right side with adaptive margin
         total_h = num_stops * BAR_H + (num_stops - 1) * BAR_MARGIN
         start_y = (info.current_h - total_h) // 2
         right_margin = int(info.current_w * 0.05)  # 5% margin from right
@@ -339,8 +345,13 @@ def main():
     design_h = ROWS * BAR_H_BASE * SCALE_MULTIPLIER + (ROWS - 1) * BAR_MARGIN_BASE * SCALE_MULTIPLIER
     scale = min(info.current_w / design_w, info.current_h / design_h)
     
-    # Apply grid shrink for 3+ stops
-    grid_scale = GRID_SHRINK if rows > 2 else 1.0
+    # Apply grid shrink for 3+ stops, slight shrink for 2 stops
+    if rows > 2:
+        grid_scale = GRID_SHRINK
+    elif rows == 2:
+        grid_scale = 0.9  # Slightly smaller for 2 stops to leave space for weather
+    else:
+        grid_scale = 1.0
     
     CELL_W        = int(CELL_W_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     BAR_H         = int(BAR_H_BASE * SCALE_MULTIPLIER * scale * grid_scale)
@@ -397,17 +408,30 @@ def main():
             screen.blit(surf, ((info.current_w - surf.get_width())//2,
                                (info.current_h - surf.get_height())//2))
         else:
-            # Show clock and weather on left when 2 or fewer stops
-            if rows <= 2:
+            # Show clock and weather based on stop count
+            if rows == 1:
+                # Single stop: show info at bottom center
+                if SHOW_CLOCK:
+                    current_time_str = now.strftime("%H:%M:%S")
+                    clock_surf = font_clock.render(current_time_str, True, TEXT_PRIMARY)
+                    clock_x = (info.current_w - clock_surf.get_width()) // 2
+                    clock_y = int(info.current_h * 0.75)  # 75% from top
+                    screen.blit(clock_surf, (clock_x, clock_y))
+                if weather_data:
+                    weather_text = f"{weather_data['rain']} • {weather_data['min_temp']:.1f}°C - {weather_data['max_temp']:.1f}°C"
+                    weather_surf = font_clock.render(weather_text, True, TEXT_SECONDARY)
+                    weather_x = (info.current_w - weather_surf.get_width()) // 2
+                    weather_y = int(info.current_h * 0.85)  # 85% from top
+                    screen.blit(weather_surf, (weather_x, weather_y))
+            elif rows == 2:
+                # Two stops: show info on left
                 left_margin = int(info.current_w * 0.05)  # 5% margin from left
                 clock_y = int(info.current_h * 0.15)     # 15% from top
                 weather_y = int(info.current_h * 0.35)   # 35% from top
-                # Show clock
                 if SHOW_CLOCK:
                     current_time_str = now.strftime("%H:%M:%S")
                     clock_surf = font_clock.render(current_time_str, True, TEXT_PRIMARY)
                     screen.blit(clock_surf, (left_margin, clock_y))
-                # Show weather below clock
                 if weather_data:
                     weather_text = f"{weather_data['rain']}\n{weather_data['min_temp']:.1f}°C - {weather_data['max_temp']:.1f}°C"
                     for i, line in enumerate(weather_text.split('\n')):

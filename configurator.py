@@ -432,38 +432,77 @@ def configure_single_option(config, key):
     return config
 
 def manage_category_settings(config, category_name, category_keys):
-    """Manage settings within a specific category"""
+    """Manage settings within a specific category with browsable list"""
+    page_size = 10
+    current_page = 0
+    search_mode = False
+    search_results = []
+    
     while True:
         try:
-            search_query = questionary.text(f"Search {category_name} option (or press Enter to see all):").ask()
-            if search_query is None:  # ESC pressed
+            if search_mode:
+                # Search mode - show search results
+                available_keys = search_results
+                prompt = f"Search results for {category_name} (type to search again, Enter to browse all):"
+            else:
+                # Browse mode - show paginated list
+                available_keys = category_keys
+                prompt = f"Browse {category_name} options (type to search, Enter to continue):"
+            
+            # Get user input
+            user_input = questionary.text(prompt).ask()
+            if user_input is None:  # ESC pressed
                 break
             
-            if search_query.strip():
-                matches = fuzzy_search_config(search_query, category_keys)
+            if user_input.strip():
+                # User typed something - switch to search mode
+                matches = fuzzy_search_config(user_input, category_keys)
                 if not matches:
-                    print(f"No {category_name.lower()} options found matching '{search_query}'")
+                    print(f"No {category_name.lower()} options found matching '{user_input}'")
                     continue
-                available_keys = matches
+                search_results = matches
+                search_mode = True
+                current_page = 0
             else:
-                available_keys = category_keys
+                # User pressed Enter - show current page
+                search_mode = False
+            
+            # Paginate results
+            start_idx = current_page * page_size
+            end_idx = start_idx + page_size
+            page_keys = available_keys[start_idx:end_idx]
             
             # Create choices with descriptions
             choices = []
-            for key in available_keys:
+            for key in page_keys:
                 desc = CONFIG_DESCRIPTIONS.get(key, "")
                 current_val = config.get(key, DEFAULTS.get(key, ""))
                 choice_text = f"{key}: {desc} [current: {current_val}]"
                 choices.append(choice_text)
+            
+            # Add navigation options
+            if current_page > 0:
+                choices.append("← Previous page")
+            if end_idx < len(available_keys):
+                choices.append("→ Next page")
+            if search_mode:
+                choices.append("Browse all options")
             choices.append("Back to main menu")
             
             selected = questionary.select(f"Select {category_name.lower()} option to configure:", choices=choices).ask()
             if selected is None or selected == "Back to main menu":
                 break
-            
-            # Extract key from choice text
-            selected_key = selected.split(":")[0]
-            config = configure_single_option(config, selected_key)
+            elif selected == "← Previous page":
+                current_page = max(0, current_page - 1)
+            elif selected == "→ Next page":
+                current_page += 1
+            elif selected == "Browse all options":
+                search_mode = False
+                current_page = 0
+            else:
+                # Extract key from choice text and configure
+                selected_key = selected.split(":")[0]
+                config = configure_single_option(config, selected_key)
             
         except KeyboardInterrupt:
             break
