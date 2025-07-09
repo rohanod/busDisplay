@@ -5,13 +5,20 @@ USER_HOME="${HOME}"
 USER_NAME="$(whoami)"
 REPO_URL="https://github.com/rohanod/busDisplay.git"
 INSTALL_DIR="${USER_HOME}/busdisplay"
+CONFIG_DIR="${USER_HOME}/.config/busdisplay"
+CONFIG_FILE="${CONFIG_DIR}/config.json"
 
 echo "Installing Bus Display for Raspberry Pi..."
 
 # Install required packages
 echo "Installing system packages..."
 sudo apt update
-sudo apt install -y git xserver-xorg xinit python3-venv python3-pip x11-xserver-utils
+sudo apt install -y git xserver-xorg xinit python3-venv python3-pip python3-dev \
+    x11-xserver-utils libcairo2-dev libcairo2 libgirepository1.0-dev pkg-config \
+    build-essential libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev \
+    libsdl2-ttf-dev libfreetype6-dev libportmidi-dev libjpeg-dev \
+    python3-setuptools python3-wheel curl libglib2.0-dev libpango1.0-dev \
+    libgdk-pixbuf2.0-dev libffi-dev shared-mime-info
 
 # Add user to required groups for X11 and console access
 echo "Configuring X11 permissions..."
@@ -33,6 +40,25 @@ echo "Setting up Python environment..."
 cd "$INSTALL_DIR"
 bash setup_env.sh
 
+# Create config directory and default config file
+echo "Creating configuration directory..."
+mkdir -p "$CONFIG_DIR"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Creating default configuration file..."
+    cat > "$CONFIG_FILE" << 'EOF'
+{
+  "stops": [],
+  "max_departures": 8,
+  "fetch_interval": 60,
+  "max_minutes": 120,
+  "show_clock": true
+}
+EOF
+    echo "Default config created at $CONFIG_FILE"
+    echo "You MUST configure your stops before the display will work!"
+fi
+
 # Configure git safe directory
 echo "Configuring git..."
 sudo git config --global --add safe.directory "$INSTALL_DIR"
@@ -51,9 +77,19 @@ echo "Installing systemd service..."
 sed -e "s|__USER__|${USER_NAME}|g" -e "s|__HOME__|${USER_HOME}|g" busdisplay.service | sudo tee /etc/systemd/system/busdisplay.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable busdisplay.service
-sudo systemctl start busdisplay.service
 
 echo "Installation complete!"
-echo "The bus display should now be running on your HDMI output."
-echo "Edit ~/.config/busdisplay/stops.json to configure your stops."
-echo "Use 'sudo systemctl status busdisplay' to check service status."
+echo ""
+echo "IMPORTANT: You must configure your stops before starting the service!"
+echo "Run the interactive configurator:"
+echo "  cd ~/busdisplay"
+echo "  source venv/bin/activate"
+echo "  python configurator.py"
+echo ""
+echo "Or manually edit: $CONFIG_FILE"
+echo ""
+echo "After configuration, start the service with:"
+echo "  sudo systemctl start busdisplay.service"
+echo ""
+echo "Check service status: sudo systemctl status busdisplay"
+echo "View logs: journalctl -u busdisplay -f"

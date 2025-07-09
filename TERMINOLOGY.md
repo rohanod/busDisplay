@@ -16,11 +16,6 @@ This document defines the standard terminology used throughout the Bus Display p
 - 2 stops: Left side
 - 3+ stops: Top corner
 
-**Weather Display**: Shows current weather information including rain status and temperature range. Position varies based on number of stops:
-- 1 stop: Bottom center (below clock)
-- 2 stops: Left side (below clock)
-- 3+ stops: Bottom center
-
 ## Layout Terms
 
 **Stop Layout**: The arrangement of stop cards on screen:
@@ -31,7 +26,7 @@ This document defines the standard terminology used throughout the Bus Display p
 
 **Grid Scale**: Size multiplier applied to stop cards:
 - 1 stop: 1.0 (full size)
-- 2 stops: 0.9 (slightly smaller for weather space)
+- 2 stops: 0.9 (slightly smaller)
 - 3+ stops: 0.7 (shrunk to fit more cards)
 
 ## Configuration Terms

@@ -8,12 +8,15 @@ A full-screen bus/tram departure display for Raspberry Pi with OTA updates, desi
 curl -fsSL https://raw.githubusercontent.com/rohanod/busDisplay/main/install.sh | bash
 ```
 
+**Important:** After installation, you must configure your stops before the display will work. The installer creates a default config file but you need to add your stops.
+
 ## Features
 
 - Full-screen Pygame display optimized for any HDMI resolution
 - Auto-scaling fonts and UI elements
 - Real-time departures from Search.ch API
 - Highlights due departures (≤0 min) with orange background
+- Styled clock widget matching departure card design
 - OTA updates via git pull on every service restart
 - Systemd service for automatic startup
 - Runs on tty0 without desktop environment
@@ -24,11 +27,16 @@ curl -fsSL https://raw.githubusercontent.com/rohanod/busDisplay/main/install.sh 
 
 For a much easier setup experience, you can use the interactive configuration tool. It helps you search for stops and configure all display options from a simple menu.
 
-To launch the tool, run:
+**After installation, you MUST configure your stops:**
 ```bash
 cd ~/busdisplay
 source venv/bin/activate
 python configurator.py
+```
+
+Then start the service:
+```bash
+sudo systemctl start busdisplay
 ```
 
 ### Manual Configuration
@@ -65,7 +73,7 @@ If you prefer to edit the file by hand, create `~/.config/busdisplay/config.json
 | `fetch_interval` | Seconds between data fetches | `60` | `30` |
 | `http_timeout` | HTTP request timeout in seconds | `10` | `15` |
 | `max_minutes` | Hide departures beyond X minutes | `120` | `90` |
-| `show_clock` | Show current time (HH:MM:SS) in corner | `true` | `false` |
+| `show_clock` | Show current time with styled widget | `true` | `false` |
 | `cols` | Maximum departure columns | `8` | `6` |
 | `rows` | Maximum stop rows | `2` | `3` |
 | `cell_w` | Base cell width | `140` | `120` |
@@ -84,9 +92,16 @@ If you prefer to edit the file by hand, create `~/.config/busdisplay/config.json
 | `grid_shrink` | Shrink multiplier for 3+ stops | `0.8` | `0.7` |
 
 ### Layout Behavior
-- **1-2 stops**: Vertical stack
-- **3 stops**: Two on top, one centered below
-- **4+ stops**: 2x2 grid
+- **1 stop**: Centered with clock widget below in card style
+- **2 stops**: Right-aligned with clock widget on left in card style
+- **3 stops**: Two on top, one centered below with corner clock
+- **4+ stops**: 2x2 grid with corner clock
+
+### Widget Styling
+- Clock widget uses the same card styling as departure displays
+- Consistent rounded corners, shadows, and dark theme
+- Orange accent color for digital clock display
+- Fixed positioning based on number of stops
 
 ## Service Management
 

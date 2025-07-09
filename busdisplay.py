@@ -75,6 +75,7 @@ ICON_LINE_MULTIPLIER = config.get("icon_line_multiplier", DEFAULT_ICON_LINE_MULT
 BORDER_RADIUS_BASE = config.get("border_radius", DEFAULT_BORDER_RADIUS)
 SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
 GRID_SHRINK = config.get("grid_shrink", DEFAULT_GRID_SHRINK)
+
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
 MAX_SHOW       = config.get("max_departures", 8)
@@ -91,7 +92,6 @@ TRAM_SVG_FILE  = os.path.join(os.path.dirname(__file__), "tram.svg")
 
 BLACK, WHITE   = (0, 0, 0), (255, 255, 255)
 ORANGE, RED    = (255, 140, 0), (255, 69, 58)
-BLUE, GREEN    = (0, 122, 255), (52, 199, 89)
 DARK_BG        = (18, 18, 20)
 CARD_BG        = (44, 44, 46)
 CARD_SHADOW    = (0, 0, 0, 60)
@@ -114,28 +114,6 @@ def _load_svg(path: str, w: int, h: int) -> pygame.Surface:
 
 rows       = len(STOPS)
 results    = [None] * rows
-weather_data = None
-
-# ────────── Networking ──────────
-def fetch_weather():
-    try:
-        resp = requests.get("https://api.open-meteo.com/v1/forecast", params={
-            "latitude": 46.1925,
-            "longitude": 6.17017,
-            "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
-            "timezone": "Europe/Zurich"
-        }, timeout=FETCH_TIMEOUT)
-        resp.raise_for_status()
-        data = resp.json()
-        today = data["daily"]
-        return {
-            "max_temp": today["temperature_2m_max"][0],
-            "min_temp": today["temperature_2m_min"][0],
-            "rain": "Rain" if today["precipitation_sum"][0] > 0 else "No rain"
-        }
-    except Exception:
-        log.error("Weather fetch error", exc_info=True)
-    return None
 
 def fetch(stop):
     limit = stop.get("Limit", API_LIMIT)
@@ -148,10 +126,20 @@ def fetch(stop):
                 "transportation_types": "bus,tram",
                 "limit": limit,
                 "show_delays": "1",
+                "mode": "depart",
             },
             timeout=FETCH_TIMEOUT,
         )
         log.info(f"HTTP {response.status_code} for stop {stop['ID']} ({len(response.content)} bytes)")
+        if response.status_code == 429:
+            log.warning(f"Rate limited (HTTP 429). Consider increasing fetch_interval in config.")
+            return "?", []
+        elif response.status_code != 200:
+            log.error(f"API returned status {response.status_code}: {response.text}")
+            return "?", []
+        if len(response.content) == 0:
+            log.error("API returned empty response")
+            return "?", []
         data = response.json()
     except Exception:
         log.error("Fetch error", exc_info=True)
@@ -181,11 +169,12 @@ def fetch(stop):
         # No filtering if neither LinesInclude nor LinesExclude
         try:
             ts = datetime.datetime.strptime(c["time"], "%Y-%m-%d %H:%M:%S")
-            # Add delay if present
-            delay_minutes = c.get("delay", 0)
-            if delay_minutes:
+            # Add departure delay if present
+            dep_delay = c.get("dep_delay", "+0")
+            if dep_delay and dep_delay != "X" and dep_delay.startswith("+"):
+                delay_minutes = int(dep_delay[1:])
                 ts += datetime.timedelta(minutes=delay_minutes)
-        except ValueError:
+        except (ValueError, TypeError):
             continue
         delta = round((ts - now).total_seconds() / 60)
         if delta < 0 or delta > MAX_MINUTES:
@@ -319,8 +308,9 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
     return positions
 
 # ────────── Main loop ──────────
+
 def main():
-    global screen, info, font_num, font_now, font_stop, font_line, font_clock, clock_img, tram_img, weather_data
+    global screen, info, font_now, font_stop, font_line, font_clock, font_digital, clock_img, tram_img
     
     # ────────── Pygame init ──────────
     log.info(f"DISPLAY environment: {os.environ.get('DISPLAY', 'Not set')}")
@@ -349,7 +339,7 @@ def main():
     if rows > 2:
         grid_scale = GRID_SHRINK
     elif rows == 2:
-        grid_scale = 0.9  # Slightly smaller for 2 stops to leave space for weather
+        grid_scale = 0.9  # Slightly smaller for 2 stops
     else:
         grid_scale = 1.0
     
@@ -365,6 +355,7 @@ def main():
     ICON_SIZE     = int(ICON_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+
     
     # Initialize fonts and images after scaling is calculated
     font_minute = pygame.font.SysFont("DejaVuSans", MINUTE_SIZE, bold=True)
@@ -372,11 +363,11 @@ def main():
     font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
     font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
     font_clock = pygame.font.SysFont("DejaVuSans", int(STOP_NAME_SIZE * 0.8), bold=True)
+    font_digital = pygame.font.SysFont("Courier", int(STOP_NAME_SIZE * 0.6), bold=True)  # Digital clock font
     
     # Fixed card dimensions
-    global FIXED_CARD_W, FIXED_CELL_W
+    global FIXED_CARD_W
     FIXED_CARD_W = int(800 * SCALE_MULTIPLIER * scale * grid_scale)
-    FIXED_CELL_W = int(100 * SCALE_MULTIPLIER * scale * grid_scale)
     
     clock_img = _load_svg(CLOCK_SVG_FILE, ICON_SIZE, ICON_SIZE)
     tram_img  = _load_svg(TRAM_SVG_FILE, ICON_SIZE, ICON_SIZE)
@@ -408,35 +399,54 @@ def main():
             screen.blit(surf, ((info.current_w - surf.get_width())//2,
                                (info.current_h - surf.get_height())//2))
         else:
-            # Show clock and weather based on stop count
+            # Show clock based on stop count
             if rows == 1:
-                # Single stop: show info at bottom center
+                # Single stop: clock widget at bottom center
                 if SHOW_CLOCK:
+                    widget_y = int(info.current_h * 0.75)
+                    widget_w = int(FIXED_CARD_W * 0.4)
+                    widget_h = int(BAR_H * 0.3)
+                    clock_x = (info.current_w - widget_w) // 2
+                    
+                    # Draw clock card
+                    clock_rect = (clock_x, widget_y, widget_w, widget_h)
+                    draw_shadow(screen, clock_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
+                    draw_rounded_rect(screen, CARD_BG, clock_rect, BORDER_RADIUS)
+                    
+                    # Clock content
+                    icon_x = clock_x + BAR_PADDING
+                    icon_y = widget_y + (widget_h - ICON_SIZE) // 2
+                    screen.blit(clock_img, (icon_x, icon_y))
+                    
                     current_time_str = now.strftime("%H:%M:%S")
-                    clock_surf = font_clock.render(current_time_str, True, TEXT_PRIMARY)
-                    clock_x = (info.current_w - clock_surf.get_width()) // 2
-                    clock_y = int(info.current_h * 0.75)  # 75% from top
-                    screen.blit(clock_surf, (clock_x, clock_y))
-                if weather_data:
-                    weather_text = f"{weather_data['rain']} • {weather_data['min_temp']:.1f}°C - {weather_data['max_temp']:.1f}°C"
-                    weather_surf = font_clock.render(weather_text, True, TEXT_SECONDARY)
-                    weather_x = (info.current_w - weather_surf.get_width()) // 2
-                    weather_y = int(info.current_h * 0.85)  # 85% from top
-                    screen.blit(weather_surf, (weather_x, weather_y))
+                    time_surf = font_digital.render(current_time_str, True, ACCENT_COLOR)
+                    time_x = icon_x + ICON_SIZE + CARD_PADDING
+                    time_y = widget_y + (widget_h - time_surf.get_height()) // 2
+                    screen.blit(time_surf, (time_x, time_y))
+                    
             elif rows == 2:
-                # Two stops: show info on left
-                left_margin = int(info.current_w * 0.05)  # 5% margin from left
-                clock_y = int(info.current_h * 0.15)     # 15% from top
-                weather_y = int(info.current_h * 0.35)   # 35% from top
+                # Two stops: clock widget on left
                 if SHOW_CLOCK:
+                    left_margin = int(info.current_w * 0.05)
+                    widget_w = int(FIXED_CARD_W * 0.4)
+                    widget_h = int(BAR_H * 0.3)
+                    clock_y = int(info.current_h * 0.35)  # Centered vertically
+                    
+                    # Draw clock card
+                    clock_rect = (left_margin, clock_y, widget_w, widget_h)
+                    draw_shadow(screen, clock_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
+                    draw_rounded_rect(screen, CARD_BG, clock_rect, BORDER_RADIUS)
+                    
+                    # Clock content
+                    icon_x = left_margin + BAR_PADDING
+                    icon_y = clock_y + (widget_h - ICON_SIZE) // 2
+                    screen.blit(clock_img, (icon_x, icon_y))
+                    
                     current_time_str = now.strftime("%H:%M:%S")
-                    clock_surf = font_clock.render(current_time_str, True, TEXT_PRIMARY)
-                    screen.blit(clock_surf, (left_margin, clock_y))
-                if weather_data:
-                    weather_text = f"{weather_data['rain']}\n{weather_data['min_temp']:.1f}°C - {weather_data['max_temp']:.1f}°C"
-                    for i, line in enumerate(weather_text.split('\n')):
-                        weather_surf = font_clock.render(line, True, TEXT_SECONDARY)
-                        screen.blit(weather_surf, (left_margin, weather_y + i * int(font_clock.get_height() * 1.2)))
+                    time_surf = font_digital.render(current_time_str, True, ACCENT_COLOR)
+                    time_x = icon_x + ICON_SIZE + CARD_PADDING
+                    time_y = clock_y + (widget_h - time_surf.get_height()) // 2
+                    screen.blit(time_surf, (time_x, time_y))
             else:
                 # Show clock in corner for 3+ stops
                 if SHOW_CLOCK:
@@ -447,14 +457,6 @@ def main():
             positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
             for idx, (x, y) in enumerate(positions[:rows]):
                 draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
-            
-            # Show weather at bottom only for 3+ stops
-            if rows > 2 and weather_data:
-                weather_text = f"{weather_data['rain']} • {weather_data['min_temp']:.1f}°C - {weather_data['max_temp']:.1f}°C"
-                weather_surf = font_clock.render(weather_text, True, TEXT_SECONDARY)
-                weather_x = (info.current_w - weather_surf.get_width()) // 2
-                weather_y = info.current_h - weather_surf.get_height() - int(info.current_h * 0.02)
-                screen.blit(weather_surf, (weather_x, weather_y))
         pygame.display.flip()
         
         # Fetch based on interval
@@ -463,15 +465,19 @@ def main():
             log.info(f"Fetch interval reached, fetching all {len(STOPS)} stops")
             for i, stop in enumerate(STOPS):
                 results[i] = fetch(stop)
-            # Fetch weather data less frequently (every 10 minutes)
-            if weather_data is None or current_time % 600 < FETCH_INTERVAL:
-                weather_data = fetch_weather()
         
         for e in pygame.event.get():
             if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                 pygame.quit(); sys.exit(0)
         
-        time.sleep(0.1 if loading else 0.5)
+        # Precise timing for smooth clock updates
+        if loading:
+            time.sleep(0.1)
+        else:
+            # Sleep until next second boundary for smooth clock
+            now_time = time.time()
+            sleep_time = 1.0 - (now_time % 1.0)
+            time.sleep(sleep_time)
 
 if __name__ == "__main__":
     try:
