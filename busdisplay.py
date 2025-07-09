@@ -131,8 +131,10 @@ def fetch(stop):
             timeout=FETCH_TIMEOUT,
         )
         log.info(f"HTTP {response.status_code} for stop {stop['ID']} ({len(response.content)} bytes)")
+        log.info(f"Response content: {response.text}")
         if response.status_code == 429:
             log.warning(f"Rate limited (HTTP 429). Consider increasing fetch_interval in config.")
+            log.warning(f"Rate limit response: {response.text}")
             return "?", []
         elif response.status_code != 200:
             log.error(f"API returned status {response.status_code}: {response.text}")
