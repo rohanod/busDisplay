@@ -30,6 +30,9 @@ DEFAULT_FETCH_INTERVAL = 60
 DEFAULT_WIDGET_SIZE = 320
 DEFAULT_WIDGET_TEXT_SIZE = 36
 DEFAULT_WIDGET_ICON_SIZE = 48
+DEFAULT_GRID_WIDGET_WIDTH = 280
+DEFAULT_GRID_WIDGET_HEIGHT = 100
+DEFAULT_GRID_SCALE = 0.85
 
 ARRETS_CSV_URL = "https://raw.githubusercontent.com/rohanod/arrets/refs/heads/main/arrets.csv"
 DEFAULT_CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
@@ -48,7 +51,9 @@ DEFAULTS = {
     "fetch_interval": DEFAULT_FETCH_INTERVAL, "http_timeout": DEFAULT_HTTP_TIMEOUT, 
     "max_minutes": 120, "show_clock": True, "show_weather": True,
     "widget_size": DEFAULT_WIDGET_SIZE, "widget_text_size": DEFAULT_WIDGET_TEXT_SIZE,
-    "widget_icon_size": DEFAULT_WIDGET_ICON_SIZE
+    "widget_icon_size": DEFAULT_WIDGET_ICON_SIZE,
+    "grid_widget_width": DEFAULT_GRID_WIDGET_WIDTH, "grid_widget_height": DEFAULT_GRID_WIDGET_HEIGHT,
+    "grid_scale": DEFAULT_GRID_SCALE
 }
 
 # Config option descriptions for better UX
@@ -77,7 +82,10 @@ CONFIG_DESCRIPTIONS = {
     "show_weather": "Show weather widgets (temperature + condition)",
     "widget_size": "Widget size (all widgets)",
     "widget_text_size": "Widget text font size",
-    "widget_icon_size": "Widget icon size"
+    "widget_icon_size": "Widget icon size",
+    "grid_widget_width": "Grid mode widget width (3+ stops)",
+    "grid_widget_height": "Grid mode widget height (3+ stops)",
+    "grid_scale": "Grid mode scale factor (3+ stops) - affects cards, widgets, and all elements"
 }
 
 # Categories for organized configuration
@@ -85,6 +93,7 @@ CATEGORIES = {
     "Layout": ["cols", "rows", "bar_margin", "bar_padding", "card_padding", "border_radius", "shadow_offset"],
     "Sizing": ["cell_w", "bar_h", "minute_size", "now_size", "stop_name_size", "line_size", "icon_size", "icon_line_multiplier", "grid_shrink"],
     "Widgets": ["show_clock", "show_weather", "widget_size", "widget_text_size", "widget_icon_size"],
+    "Grid Mode (3+ stops)": ["grid_widget_width", "grid_widget_height", "grid_scale"],
     "API & Behavior": ["max_departures", "fetch_interval", "http_timeout", "max_minutes"]
 }
 

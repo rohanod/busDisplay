@@ -48,11 +48,13 @@ DEFAULT_CLOCK_TEXT_SIZE = 36
 DEFAULT_TEMP_TEXT_SIZE = 36
 DEFAULT_WEATHER_TEXT_SIZE = 28
 
-# Grid mode (3/4 stops) specific settings - configurable at top of script
+# Grid mode (3/4 stops) specific settings - configurable in config.json
 DEFAULT_GRID_WIDGET_WIDTH = 280   # Thinner widgets for grid mode
 DEFAULT_GRID_WIDGET_HEIGHT = 100  # Widget height for grid mode
-DEFAULT_GRID_CARD_WIDTH_SCALE = 0.85   # Stop card width scale for grid mode
-DEFAULT_GRID_CARD_HEIGHT_SCALE = 0.85  # Stop card height scale for grid mode
+DEFAULT_GRID_SCALE = 0.85         # Unified scale for all grid mode elements (cards, widgets, etc.)
+
+# Display options - configurable at top of script
+USE_MINMAX_TEMP_ICONS = True  # Set to True to use separate min/max temp icons instead of thermometer
 
 # ────────── Runtime Config ──────────
 CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
@@ -94,11 +96,10 @@ CLOCK_TEXT_SIZE_BASE = DEFAULT_CLOCK_TEXT_SIZE    # Fine-tune at top of script
 TEMP_TEXT_SIZE_BASE = DEFAULT_TEMP_TEXT_SIZE      # Fine-tune at top of script  
 WEATHER_TEXT_SIZE_BASE = DEFAULT_WEATHER_TEXT_SIZE # Fine-tune at top of script
 
-# Grid mode settings - configurable at top of script only
-GRID_WIDGET_WIDTH_BASE = DEFAULT_GRID_WIDGET_WIDTH
-GRID_WIDGET_HEIGHT_BASE = DEFAULT_GRID_WIDGET_HEIGHT
-GRID_CARD_WIDTH_SCALE = DEFAULT_GRID_CARD_WIDTH_SCALE
-GRID_CARD_HEIGHT_SCALE = DEFAULT_GRID_CARD_HEIGHT_SCALE
+# Grid mode settings - use config.json values if available, otherwise defaults
+GRID_WIDGET_WIDTH_BASE = GRID_WIDGET_WIDTH_CONFIG
+GRID_WIDGET_HEIGHT_BASE = GRID_WIDGET_HEIGHT_CONFIG
+GRID_SCALE_FINAL = GRID_SCALE_CONFIG  # Unified scale for all grid mode elements
 
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
@@ -108,6 +109,11 @@ MAX_MINUTES    = config.get("max_minutes", 120)
 SHOW_CLOCK     = config.get("show_clock", True)
 SHOW_WEATHER   = config.get("show_weather", True)
 FETCH_TIMEOUT  = config.get("http_timeout", DEFAULT_HTTP_TIMEOUT)
+
+# Grid mode options (available in config.json)
+GRID_SCALE_CONFIG = config.get("grid_scale", DEFAULT_GRID_SCALE)
+GRID_WIDGET_WIDTH_CONFIG = config.get("grid_widget_width", DEFAULT_GRID_WIDGET_WIDTH)
+GRID_WIDGET_HEIGHT_CONFIG = config.get("grid_widget_height", DEFAULT_GRID_WIDGET_HEIGHT)
 API_URL        = "https://search.ch/timetable/api/stationboard.fr.json"
 API_LIMIT      = 100
 SPINNER        = "|/-\\"
@@ -117,6 +123,8 @@ TRAM_SVG_FILE  = os.path.join(os.path.dirname(__file__), "svgs", "tram.svg")
 SUN_SVG_FILE   = os.path.join(os.path.dirname(__file__), "svgs", "sun.svg")
 RAIN_SVG_FILE  = os.path.join(os.path.dirname(__file__), "svgs", "rain.svg")
 THERMOMETER_SVG_FILE = os.path.join(os.path.dirname(__file__), "svgs", "thermometer.svg")
+MINTEMP_SVG_FILE = os.path.join(os.path.dirname(__file__), "svgs", "mintemp.svg")
+MAXTEMP_SVG_FILE = os.path.join(os.path.dirname(__file__), "svgs", "maxtemp.svg")
 
 BLACK, WHITE   = (0, 0, 0), (255, 255, 255)
 ORANGE, RED    = (255, 140, 0), (255, 69, 58)
@@ -225,6 +233,12 @@ def fetch(stop):
         # Store departure info (ts already includes delay)
         deps.append((ts, line, max(delta, 0), c["terminal"]["name"]))
     deps.sort(key=lambda x: x[0])
+    
+    # Hide municipality from stop name if configured per stop
+    hide_municipality = stop.get("hide_municipality", False)
+    if hide_municipality and ", " in name:
+        name = name.split(", ", 1)[1]  # Remove "Municipality, " prefix
+    
     return name, deps[:MAX_SHOW]
 
 def fetch_weather():
@@ -354,7 +368,7 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
         line_y = content_y + (3 * content_h // 4) - (line_surf.get_height() // 2)
         screen.blit(line_surf, (line_x, line_y))
 
-def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img):
+def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, x0, font_temp, thermometer_img, mintemp_img, maxtemp_img):
     """Draw temperature widget"""
     if not weather_data:
         return
@@ -366,25 +380,59 @@ def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIG
     # Draw main card
     draw_rounded_rect(screen, CARD_BG, temp_rect, BORDER_RADIUS)
     
-    # Temperature content with thermometer icon - centered together
-    temp_text = f"Min: {weather_data['min_temp']}°C, Max: {weather_data['max_temp']}°C"
-    temp_surf = font_temp.render(temp_text, True, TEXT_PRIMARY)
-    
-    # Calculate total width of icon + padding + text
-    total_content_width = thermometer_img.get_width() + CARD_PADDING + temp_surf.get_width()
-    
-    # Center the combined content
-    content_start_x = x + (WIDGET_SIZE - total_content_width) // 2
-    
-    # Draw thermometer icon
-    icon_x = content_start_x
-    icon_y = y + (WIDGET_HEIGHT - thermometer_img.get_height()) // 2
-    screen.blit(thermometer_img, (icon_x, icon_y))
-    
-    # Draw temperature text
-    text_x = icon_x + thermometer_img.get_width() + CARD_PADDING
-    text_y = y + (WIDGET_HEIGHT - temp_surf.get_height()) // 2
-    screen.blit(temp_surf, (text_x, text_y))
+    if USE_MINMAX_TEMP_ICONS:
+        # Use separate min/max temperature icons
+        min_text = f"{weather_data['min_temp']}°"
+        max_text = f"{weather_data['max_temp']}°"
+        min_surf = font_temp.render(min_text, True, BLUE)  # Blue for min temp
+        max_surf = font_temp.render(max_text, True, RED)   # Red for max temp
+        
+        # Calculate layout for min and max temps side by side
+        min_content_width = mintemp_img.get_width() + CARD_PADDING//2 + min_surf.get_width()
+        max_content_width = maxtemp_img.get_width() + CARD_PADDING//2 + max_surf.get_width()
+        total_content_width = min_content_width + CARD_PADDING + max_content_width
+        
+        # Center the combined content
+        content_start_x = x + (WIDGET_SIZE - total_content_width) // 2
+        
+        # Draw min temperature
+        min_icon_x = content_start_x
+        min_icon_y = y + (WIDGET_HEIGHT - mintemp_img.get_height()) // 2
+        screen.blit(mintemp_img, (min_icon_x, min_icon_y))
+        
+        min_text_x = min_icon_x + mintemp_img.get_width() + CARD_PADDING//2
+        min_text_y = y + (WIDGET_HEIGHT - min_surf.get_height()) // 2
+        screen.blit(min_surf, (min_text_x, min_text_y))
+        
+        # Draw max temperature
+        max_icon_x = min_text_x + min_surf.get_width() + CARD_PADDING
+        max_icon_y = y + (WIDGET_HEIGHT - maxtemp_img.get_height()) // 2
+        screen.blit(maxtemp_img, (max_icon_x, max_icon_y))
+        
+        max_text_x = max_icon_x + maxtemp_img.get_width() + CARD_PADDING//2
+        max_text_y = y + (WIDGET_HEIGHT - max_surf.get_height()) // 2
+        screen.blit(max_surf, (max_text_x, max_text_y))
+        
+    else:
+        # Use single thermometer icon with range
+        temp_text = f"{weather_data['min_temp']}°-{weather_data['max_temp']}°C"
+        temp_surf = font_temp.render(temp_text, True, TEXT_PRIMARY)
+        
+        # Calculate total width of icon + padding + text
+        total_content_width = thermometer_img.get_width() + CARD_PADDING + temp_surf.get_width()
+        
+        # Center the combined content
+        content_start_x = x + (WIDGET_SIZE - total_content_width) // 2
+        
+        # Draw thermometer icon
+        icon_x = content_start_x
+        icon_y = y + (WIDGET_HEIGHT - thermometer_img.get_height()) // 2
+        screen.blit(thermometer_img, (icon_x, icon_y))
+        
+        # Draw temperature text
+        text_x = icon_x + thermometer_img.get_width() + CARD_PADDING
+        text_y = y + (WIDGET_HEIGHT - temp_surf.get_height()) // 2
+        screen.blit(temp_surf, (text_x, text_y))
 
 def draw_weather_condition_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img):
     """Draw weather condition widget"""
@@ -440,8 +488,8 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
     elif num_stops == 3:
         # 3 stops: stop cards at top center (2 on top, 1 centered below)
         # Use grid mode card scaling for 3 stops
-        card_w = int(FIXED_CARD_W * GRID_CARD_WIDTH_SCALE)
-        card_h = int(BAR_H * GRID_CARD_HEIGHT_SCALE)
+        card_w = int(FIXED_CARD_W * GRID_SCALE_FINAL)
+        card_h = int(BAR_H * GRID_SCALE_FINAL)
         margin = int(BAR_MARGIN * 0.7)     # Smaller margins
         
         # Center the grid at top
@@ -458,8 +506,8 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
     else:
         # 4+ stops: stop cards at top center in 2x2 grid
         # Use grid mode card scaling for 4+ stops
-        card_w = int(FIXED_CARD_W * GRID_CARD_WIDTH_SCALE)
-        card_h = int(BAR_H * GRID_CARD_HEIGHT_SCALE)
+        card_w = int(FIXED_CARD_W * GRID_SCALE_FINAL)
+        card_h = int(BAR_H * GRID_SCALE_FINAL)
         margin = int(BAR_MARGIN * 0.6)     # Smaller margins
         
         # Center the 2x2 grid at top
@@ -479,7 +527,7 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
 # ────────── Main loop ──────────
 
 def main():
-    global screen, info, font_now, font_stop, font_line, font_clock, font_digital, font_widget, font_clock_widget, font_temp, font_weather_text, clock_img, tram_img, sun_img, rain_img, thermometer_img
+    global screen, info, font_now, font_stop, font_line, font_clock, font_digital, font_widget, font_clock_widget, font_temp, font_weather_text, clock_img, tram_img, sun_img, rain_img, thermometer_img, mintemp_img, maxtemp_img
     
     # ────────── Pygame init ──────────
     log.info(f"DISPLAY environment: {os.environ.get('DISPLAY', 'Not set')}")
@@ -506,7 +554,7 @@ def main():
     
     # Apply grid shrink for 3+ stops, slight shrink for 2 stops
     if rows > 2:
-        grid_scale = GRID_SHRINK
+        grid_scale = GRID_SHRINK * GRID_SCALE_FINAL  # Apply additional grid mode scaling
     elif rows == 2:
         grid_scale = 0.9  # Slightly smaller for 2 stops
     else:
@@ -534,9 +582,13 @@ def main():
     TEMP_TEXT_SIZE = int(TEMP_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     WEATHER_TEXT_SIZE = int(WEATHER_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     
-    # Grid mode widget dimensions (for 3/4 stops)
-    GRID_WIDGET_WIDTH = int(GRID_WIDGET_WIDTH_BASE * SCALE_MULTIPLIER * scale * grid_scale)
-    GRID_WIDGET_HEIGHT = int(GRID_WIDGET_HEIGHT_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    # Grid mode widget dimensions (for 3/4 stops) - apply additional scaling
+    if rows >= 3:
+        grid_widget_scale = grid_scale * GRID_SCALE_FINAL
+    else:
+        grid_widget_scale = grid_scale
+    GRID_WIDGET_WIDTH = int(GRID_WIDGET_WIDTH_BASE * SCALE_MULTIPLIER * scale * grid_widget_scale)
+    GRID_WIDGET_HEIGHT = int(GRID_WIDGET_HEIGHT_BASE * SCALE_MULTIPLIER * scale * grid_widget_scale)
 
     
     # Initialize fonts and images after scaling is calculated
@@ -560,6 +612,8 @@ def main():
     sun_img   = _load_svg(SUN_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
     rain_img  = _load_svg(RAIN_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
     thermometer_img = _load_svg(THERMOMETER_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
+    mintemp_img = _load_svg(MINTEMP_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
+    maxtemp_img = _load_svg(MAXTEMP_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
     
     frame_count = 0
     last_fetch = 0
@@ -628,7 +682,7 @@ def main():
                 # Weather widgets next to clock
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, current_x0, font_temp, thermometer_img, mintemp_img, maxtemp_img)
                     current_x += WIDGET_SIZE + BAR_MARGIN
                     
                     # Weather condition widget
@@ -671,7 +725,7 @@ def main():
                 # Weather widgets next to clock
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, current_x0, font_temp, thermometer_img, mintemp_img, maxtemp_img)
                     current_x += WIDGET_SIZE + BAR_MARGIN
                     
                     # Weather condition widget
@@ -719,7 +773,7 @@ def main():
                 # Weather widgets side by side with clock at bottom (using grid dimensions)
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, current_x0, font_temp, thermometer_img, mintemp_img, maxtemp_img)
                     current_x += GRID_WIDGET_WIDTH + BAR_MARGIN
                     
                     # Weather condition widget
@@ -729,8 +783,8 @@ def main():
             for idx, (x, y) in enumerate(positions[:rows]):
                 # Use grid mode card scaling for 3+ stops
                 if rows >= 3:
-                    card_w = int(FIXED_CARD_W * GRID_CARD_WIDTH_SCALE)
-                    card_h = int(BAR_H * GRID_CARD_HEIGHT_SCALE)
+                    card_w = int(FIXED_CARD_W * GRID_SCALE_FINAL)
+                    card_h = int(BAR_H * GRID_SCALE_FINAL)
                 else:
                     card_w = FIXED_CARD_W
                     card_h = BAR_H
