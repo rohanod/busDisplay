@@ -140,8 +140,34 @@ def find_stop(stops_data, prompt_text):
                 print("Search term cannot be empty.")
                 continue
 
-            normalized_search = normalize_str(search_term)
-            matches = [s for s in stops_data if normalized_search in normalize_str(s.get('Stop', ''))]
+            # Flexible search: try multiple variants of the search term
+            search_variants = [
+                normalize_str(search_term),
+                normalize_str(search_term.replace(' ', '-')),
+                normalize_str(search_term.replace('-', ' ')),
+                normalize_str(search_term.replace(' ', '')),
+                normalize_str(search_term.replace('-', ''))
+            ]
+            
+            matches = []
+            for stop in stops_data:
+                stop_name_normalized = normalize_str(stop.get('Stop', ''))
+                stop_name_variants = [
+                    stop_name_normalized,
+                    stop_name_normalized.replace(' ', '-'),
+                    stop_name_normalized.replace('-', ' '),
+                    stop_name_normalized.replace(' ', ''),
+                    stop_name_normalized.replace('-', '')
+                ]
+                
+                # Check if any search variant matches any stop name variant
+                for search_var in search_variants:
+                    for name_var in stop_name_variants:
+                        if search_var in name_var:
+                            matches.append(stop)
+                            break
+                    if stop in matches:
+                        break
 
             if not matches:
                 print(f"No stops found matching '{search_term}'. Please try again.")

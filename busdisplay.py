@@ -44,6 +44,9 @@ DEFAULT_FETCH_INTERVAL     = 60
 DEFAULT_WIDGET_SIZE = 320
 DEFAULT_WIDGET_TEXT_SIZE = 36
 DEFAULT_WIDGET_ICON_SIZE = 48
+DEFAULT_CLOCK_TEXT_SIZE = 36
+DEFAULT_TEMP_TEXT_SIZE = 36
+DEFAULT_WEATHER_TEXT_SIZE = 28
 
 # ────────── Runtime Config ──────────
 CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
@@ -79,8 +82,11 @@ BORDER_RADIUS_BASE = config.get("border_radius", DEFAULT_BORDER_RADIUS)
 SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
 GRID_SHRINK = config.get("grid_shrink", DEFAULT_GRID_SHRINK)
 WIDGET_SIZE_BASE = config.get("widget_size", DEFAULT_WIDGET_SIZE)
-WIDGET_TEXT_SIZE_BASE = config.get("widget_text_size", DEFAULT_WIDGET_TEXT_SIZE)
+WIDGET_TEXT_SIZE_BASE = DEFAULT_WIDGET_TEXT_SIZE  # Not configurable in config.json
 WIDGET_ICON_SIZE_BASE = config.get("widget_icon_size", DEFAULT_WIDGET_ICON_SIZE)
+CLOCK_TEXT_SIZE_BASE = DEFAULT_CLOCK_TEXT_SIZE    # Fine-tune at top of script
+TEMP_TEXT_SIZE_BASE = DEFAULT_TEMP_TEXT_SIZE      # Fine-tune at top of script  
+WEATHER_TEXT_SIZE_BASE = DEFAULT_WEATHER_TEXT_SIZE # Fine-tune at top of script
 
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
@@ -94,10 +100,11 @@ API_URL        = "https://search.ch/timetable/api/stationboard.fr.json"
 API_LIMIT      = 100
 SPINNER        = "|/-\\"
 
-CLOCK_SVG_FILE = os.path.join(os.path.dirname(__file__), "clock.svg")
-TRAM_SVG_FILE  = os.path.join(os.path.dirname(__file__), "tram.svg")
-SUN_SVG_FILE   = os.path.join(os.path.dirname(__file__), "sun.svg")
-RAIN_SVG_FILE  = os.path.join(os.path.dirname(__file__), "rain.svg")
+CLOCK_SVG_FILE = os.path.join(os.path.dirname(__file__), "svgs", "clock.svg")
+TRAM_SVG_FILE  = os.path.join(os.path.dirname(__file__), "svgs", "tram.svg")
+SUN_SVG_FILE   = os.path.join(os.path.dirname(__file__), "svgs", "sun.svg")
+RAIN_SVG_FILE  = os.path.join(os.path.dirname(__file__), "svgs", "rain.svg")
+THERMOMETER_SVG_FILE = os.path.join(os.path.dirname(__file__), "svgs", "thermometer.svg")
 
 BLACK, WHITE   = (0, 0, 0), (255, 255, 255)
 ORANGE, RED    = (255, 140, 0), (255, 69, 58)
@@ -335,7 +342,7 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
         line_y = content_y + (3 * content_h // 4) - (line_surf.get_height() // 2)
         screen.blit(line_surf, (line_x, line_y))
 
-def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget):
+def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img):
     """Draw temperature widget"""
     if not weather_data:
         return
@@ -347,14 +354,27 @@ def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIG
     # Draw main card
     draw_rounded_rect(screen, CARD_BG, temp_rect, BORDER_RADIUS)
     
-    # Temperature content
+    # Temperature content with thermometer icon - centered together
     temp_text = f"{weather_data['min_temp']}°-{weather_data['max_temp']}°C"
-    temp_surf = font_widget.render(temp_text, True, TEXT_PRIMARY)
-    temp_x = x + (WIDGET_SIZE - temp_surf.get_width()) // 2
-    temp_y = y + (WIDGET_HEIGHT - temp_surf.get_height()) // 2
-    screen.blit(temp_surf, (temp_x, temp_y))
+    temp_surf = font_temp.render(temp_text, True, TEXT_PRIMARY)
+    
+    # Calculate total width of icon + padding + text
+    total_content_width = thermometer_img.get_width() + CARD_PADDING + temp_surf.get_width()
+    
+    # Center the combined content
+    content_start_x = x + (WIDGET_SIZE - total_content_width) // 2
+    
+    # Draw thermometer icon
+    icon_x = content_start_x
+    icon_y = y + (WIDGET_HEIGHT - thermometer_img.get_height()) // 2
+    screen.blit(thermometer_img, (icon_x, icon_y))
+    
+    # Draw temperature text
+    text_x = icon_x + thermometer_img.get_width() + CARD_PADDING
+    text_y = y + (WIDGET_HEIGHT - temp_surf.get_height()) // 2
+    screen.blit(temp_surf, (text_x, text_y))
 
-def draw_weather_condition_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget, sun_img, rain_img):
+def draw_weather_condition_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img):
     """Draw weather condition widget"""
     if not weather_data:
         return
@@ -366,16 +386,24 @@ def draw_weather_condition_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGE
     # Draw main card
     draw_rounded_rect(screen, CARD_BG, weather_rect, BORDER_RADIUS)
     
-    # Weather icon (sun or rain)
+    # Weather icon and text - centered together
     weather_icon = rain_img if weather_data['will_rain'] else sun_img
-    icon_x = x + BAR_PADDING
+    weather_text = "Rain" if weather_data['will_rain'] else "Sunny"
+    weather_color = BLUE if weather_data['will_rain'] else ORANGE
+    weather_surf = font_weather_text.render(weather_text, True, weather_color)
+    
+    # Calculate total width of icon + padding + text
+    total_content_width = weather_icon.get_width() + CARD_PADDING + weather_surf.get_width()
+    
+    # Center the combined content
+    content_start_x = x + (WIDGET_SIZE - total_content_width) // 2
+    
+    # Draw icon
+    icon_x = content_start_x
     icon_y = y + (WIDGET_HEIGHT - weather_icon.get_height()) // 2
     screen.blit(weather_icon, (icon_x, icon_y))
     
-    # Weather status text
-    weather_text = "Rain" if weather_data['will_rain'] else "Sunny"
-    weather_color = BLUE if weather_data['will_rain'] else ORANGE
-    weather_surf = font_widget.render(weather_text, True, weather_color)
+    # Draw text
     text_x = icon_x + weather_icon.get_width() + CARD_PADDING
     text_y = y + (WIDGET_HEIGHT - weather_surf.get_height()) // 2
     screen.blit(weather_surf, (text_x, text_y))
@@ -398,54 +426,66 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
             y = start_y + i * (BAR_H + BAR_MARGIN)
             positions.append((x, y))
     elif num_stops == 3:
-        # 3 stops: widgets on left, stops on right
-        widget_space = int(WIDGET_SIZE_BASE * 1.2)  # Space for widgets
-        available_width = info.current_w - widget_space - int(info.current_w * 0.1)  # Leave margins
+        # 3 stops: compact grid layout
+        widget_space = int(WIDGET_SIZE_BASE * 1.1)  # Reduced space for widgets
+        available_width = info.current_w - widget_space - int(info.current_w * 0.06)  # Less margin
         
-        if available_width >= 2 * FIXED_CARD_W + BAR_MARGIN:
-            # Two columns on right
-            start_x = widget_space + int(info.current_w * 0.05)
+        # Use smaller cards for 3+ stops
+        card_w = int(FIXED_CARD_W * 0.85)  # 15% smaller
+        card_h = int(BAR_H * 0.85)         # 15% smaller
+        margin = int(BAR_MARGIN * 0.7)     # Smaller margins
+        
+        if available_width >= 2 * card_w + margin:
+            # 2x2 grid layout (2 on top, 1 centered below)
+            start_x = widget_space + int(info.current_w * 0.03)
             start_y = int(info.current_h * 0.15)
+            
             # Two on top row
             positions.append((start_x, start_y))
-            positions.append((start_x + FIXED_CARD_W + BAR_MARGIN, start_y))
-            # One on bottom row, centered
-            bottom_x = start_x + (FIXED_CARD_W + BAR_MARGIN) // 2
-            positions.append((bottom_x, start_y + BAR_H + BAR_MARGIN))
+            positions.append((start_x + card_w + margin, start_y))
+            # One centered below
+            bottom_x = start_x + (card_w + margin) // 2
+            positions.append((bottom_x, start_y + card_h + margin))
         else:
-            # Single column on right
-            start_x = widget_space + int(info.current_w * 0.05)
+            # Single column if not enough width
+            start_x = widget_space + int(info.current_w * 0.03)
             start_y = int(info.current_h * 0.1)
             for i in range(3):
-                positions.append((start_x, start_y + i * (BAR_H + BAR_MARGIN)))
+                positions.append((start_x, start_y + i * (card_h + margin)))
     else:
-        # 4+ stops: widgets on left, 2x2 grid on right
-        widget_space = int(WIDGET_SIZE_BASE * 1.2)  # Space for widgets
-        available_width = info.current_w - widget_space - int(info.current_w * 0.1)
+        # 4+ stops: compact 2x2 grid layout
+        widget_space = int(WIDGET_SIZE_BASE * 1.1)  # Reduced space for widgets
+        available_width = info.current_w - widget_space - int(info.current_w * 0.06)  # Less margin
         
-        if available_width >= 2 * FIXED_CARD_W + BAR_MARGIN:
+        # Use smaller cards for 4+ stops
+        card_w = int(FIXED_CARD_W * 0.8)   # 20% smaller
+        card_h = int(BAR_H * 0.8)          # 20% smaller
+        margin = int(BAR_MARGIN * 0.6)     # Smaller margins
+        
+        if available_width >= 2 * card_w + margin:
             # 2x2 grid on right
-            grid_w = 2 * FIXED_CARD_W + BAR_MARGIN
-            grid_h = 2 * BAR_H + BAR_MARGIN
-            start_x = widget_space + (available_width - grid_w) // 2
+            grid_w = 2 * card_w + margin
+            grid_h = 2 * card_h + margin
+            start_x = widget_space + int(info.current_w * 0.03)
             start_y = (info.current_h - grid_h) // 2
+            
             for i in range(min(4, num_stops)):
                 row, col = i // 2, i % 2
-                x = start_x + col * (FIXED_CARD_W + BAR_MARGIN)
-                y = start_y + row * (BAR_H + BAR_MARGIN)
+                x = start_x + col * (card_w + margin)
+                y = start_y + row * (card_h + margin)
                 positions.append((x, y))
         else:
-            # Single column on right
-            start_x = widget_space + int(info.current_w * 0.05)
+            # Single column if not enough width
+            start_x = widget_space + int(info.current_w * 0.03)
             start_y = int(info.current_h * 0.1)
             for i in range(min(4, num_stops)):
-                positions.append((start_x, start_y + i * (BAR_H + BAR_MARGIN)))
+                positions.append((start_x, start_y + i * (card_h + margin)))
     return positions
 
 # ────────── Main loop ──────────
 
 def main():
-    global screen, info, font_now, font_stop, font_line, font_clock, font_digital, font_widget, clock_img, tram_img, sun_img, rain_img
+    global screen, info, font_now, font_stop, font_line, font_clock, font_digital, font_widget, font_clock_widget, font_temp, font_weather_text, clock_img, tram_img, sun_img, rain_img, thermometer_img
     
     # ────────── Pygame init ──────────
     log.info(f"DISPLAY environment: {os.environ.get('DISPLAY', 'Not set')}")
@@ -496,6 +536,9 @@ def main():
     WIDGET_HEIGHT = int(WIDGET_SIZE * 0.4)  # All widgets same height
     WIDGET_TEXT_SIZE = int(WIDGET_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     WIDGET_ICON_SIZE = int(WIDGET_ICON_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    CLOCK_TEXT_SIZE = int(CLOCK_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    TEMP_TEXT_SIZE = int(TEMP_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    WEATHER_TEXT_SIZE = int(WEATHER_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
 
     
     # Initialize fonts and images after scaling is calculated
@@ -506,6 +549,9 @@ def main():
     font_clock = pygame.font.SysFont("DejaVuSans", int(STOP_NAME_SIZE * 0.8), bold=True)
     font_digital = pygame.font.SysFont("Courier", int(STOP_NAME_SIZE * 0.6), bold=True)  # Digital clock font
     font_widget = pygame.font.SysFont("DejaVuSans", WIDGET_TEXT_SIZE, bold=True)
+    font_clock_widget = pygame.font.SysFont("Courier", CLOCK_TEXT_SIZE, bold=True)
+    font_temp = pygame.font.SysFont("DejaVuSans", TEMP_TEXT_SIZE, bold=True)
+    font_weather_text = pygame.font.SysFont("DejaVuSans", WEATHER_TEXT_SIZE, bold=True)
     
     # Fixed card dimensions
     global FIXED_CARD_W
@@ -515,6 +561,7 @@ def main():
     tram_img  = _load_svg(TRAM_SVG_FILE, ICON_SIZE, ICON_SIZE)
     sun_img   = _load_svg(SUN_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
     rain_img  = _load_svg(RAIN_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
+    thermometer_img = _load_svg(THERMOMETER_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
     
     frame_count = 0
     last_fetch = 0
@@ -583,11 +630,11 @@ def main():
                 # Weather widgets next to clock
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget)
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
                     current_x += WIDGET_SIZE + BAR_MARGIN
                     
                     # Weather condition widget
-                    draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget, sun_img, rain_img)
+                    draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
                     
             elif rows == 2:
                 # Two stops: widgets at bottom next to each other
@@ -626,11 +673,11 @@ def main():
                 # Weather widgets next to clock
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget)
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
                     current_x += WIDGET_SIZE + BAR_MARGIN
                     
                     # Weather condition widget
-                    draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget, sun_img, rain_img)
+                    draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
             else:
                 # 3+ stops: widgets stacked on left, stop cards on right
                 left_margin = int(info.current_w * 0.05)
@@ -659,11 +706,11 @@ def main():
                 # Weather widgets stacked below clock on left
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(left_margin, current_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget)
+                    draw_temperature_widget(left_margin, current_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
                     current_y += WIDGET_HEIGHT + BAR_MARGIN
                     
                     # Weather condition widget
-                    draw_weather_condition_widget(left_margin, current_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget, sun_img, rain_img)
+                    draw_weather_condition_widget(left_margin, current_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
             
             positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
             for idx, (x, y) in enumerate(positions[:rows]):
