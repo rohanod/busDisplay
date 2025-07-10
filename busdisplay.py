@@ -97,9 +97,9 @@ TEMP_TEXT_SIZE_BASE = DEFAULT_TEMP_TEXT_SIZE      # Fine-tune at top of script
 WEATHER_TEXT_SIZE_BASE = DEFAULT_WEATHER_TEXT_SIZE # Fine-tune at top of script
 
 # Grid mode settings - use config.json values if available, otherwise defaults
-GRID_WIDGET_WIDTH_BASE = GRID_WIDGET_WIDTH_CONFIG
-GRID_WIDGET_HEIGHT_BASE = GRID_WIDGET_HEIGHT_CONFIG
-GRID_SCALE_FINAL = GRID_SCALE_CONFIG  # Unified scale for all grid mode elements
+GRID_WIDGET_WIDTH_BASE = config.get("grid_widget_width", DEFAULT_GRID_WIDGET_WIDTH)
+GRID_WIDGET_HEIGHT_BASE = config.get("grid_widget_height", DEFAULT_GRID_WIDGET_HEIGHT)
+GRID_SCALE_FINAL = config.get("grid_scale", DEFAULT_GRID_SCALE)  # Unified scale for all grid mode elements
 
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
