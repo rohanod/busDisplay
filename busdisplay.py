@@ -368,7 +368,7 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
         line_y = content_y + (3 * content_h // 4) - (line_surf.get_height() // 2)
         screen.blit(line_surf, (line_x, line_y))
 
-def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, x0, font_temp, thermometer_img, mintemp_img, maxtemp_img):
+def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img, mintemp_img, maxtemp_img):
     """Draw temperature widget"""
     if not weather_data:
         return
@@ -682,7 +682,7 @@ def main():
                 # Weather widgets next to clock
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, current_x0, font_temp, thermometer_img, mintemp_img, maxtemp_img)
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img, mintemp_img, maxtemp_img)
                     current_x += WIDGET_SIZE + BAR_MARGIN
                     
                     # Weather condition widget
@@ -725,7 +725,7 @@ def main():
                 # Weather widgets next to clock
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, current_x0, font_temp, thermometer_img, mintemp_img, maxtemp_img)
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img, mintemp_img, maxtemp_img)
                     current_x += WIDGET_SIZE + BAR_MARGIN
                     
                     # Weather condition widget
@@ -773,7 +773,7 @@ def main():
                 # Weather widgets side by side with clock at bottom (using grid dimensions)
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, current_x0, font_temp, thermometer_img, mintemp_img, maxtemp_img)
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img, mintemp_img, maxtemp_img)
                     current_x += GRID_WIDGET_WIDTH + BAR_MARGIN
                     
                     # Weather condition widget
