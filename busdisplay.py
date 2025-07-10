@@ -51,7 +51,7 @@ DEFAULT_WEATHER_TEXT_SIZE = 28
 # Grid mode (3/4 stops) specific settings - configurable in config.json
 DEFAULT_GRID_WIDGET_WIDTH = 280   # Thinner widgets for grid mode
 DEFAULT_GRID_WIDGET_HEIGHT = 100  # Widget height for grid mode
-DEFAULT_GRID_SCALE = 0.9         # Unified scale for all grid mode elements (cards, widgets, etc.)
+DEFAULT_GRID_SCALE = 1.00         # Unified scale for all grid mode elements (cards, widgets, etc.)
 
 # Display options - configurable at top of script
 USE_MINMAX_TEMP_ICONS = True  # Set to True to use separate min/max temp icons instead of thermometer
