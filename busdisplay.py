@@ -426,60 +426,48 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
             y = start_y + i * (BAR_H + BAR_MARGIN)
             positions.append((x, y))
     elif num_stops == 3:
-        # 3 stops: compact grid layout
-        widget_space = int(WIDGET_SIZE_BASE * 1.1)  # Reduced space for widgets
-        available_width = info.current_w - widget_space - int(info.current_w * 0.06)  # Less margin
+        # 3 stops: widgets left, stop cards right (2 on top, 1 centered below)
+        widget_space = int(WIDGET_SIZE_BASE * 1.2)  # Space for widgets on left
         
-        # Use smaller cards for 3+ stops
+        # Use smaller cards for 3 stops
         card_w = int(FIXED_CARD_W * 0.85)  # 15% smaller
         card_h = int(BAR_H * 0.85)         # 15% smaller
         margin = int(BAR_MARGIN * 0.7)     # Smaller margins
         
-        if available_width >= 2 * card_w + margin:
-            # 2x2 grid layout (2 on top, 1 centered below)
-            start_x = widget_space + int(info.current_w * 0.03)
-            start_y = int(info.current_h * 0.15)
-            
-            # Two on top row
-            positions.append((start_x, start_y))
-            positions.append((start_x + card_w + margin, start_y))
-            # One centered below
-            bottom_x = start_x + (card_w + margin) // 2
-            positions.append((bottom_x, start_y + card_h + margin))
-        else:
-            # Single column if not enough width
-            start_x = widget_space + int(info.current_w * 0.03)
-            start_y = int(info.current_h * 0.1)
-            for i in range(3):
-                positions.append((start_x, start_y + i * (card_h + margin)))
+        # Right side for stop cards
+        right_margin = int(info.current_w * 0.05)
+        grid_w = 2 * card_w + margin
+        start_x = info.current_w - right_margin - grid_w
+        start_y = int(info.current_h * 0.2)
+        
+        # Two on top row
+        positions.append((start_x, start_y))
+        positions.append((start_x + card_w + margin, start_y))
+        # One centered below the top two
+        bottom_x = start_x + (card_w + margin) // 2
+        positions.append((bottom_x, start_y + card_h + margin))
     else:
-        # 4+ stops: compact 2x2 grid layout
-        widget_space = int(WIDGET_SIZE_BASE * 1.1)  # Reduced space for widgets
-        available_width = info.current_w - widget_space - int(info.current_w * 0.06)  # Less margin
+        # 4+ stops: widgets left, 2x2 grid right
+        widget_space = int(WIDGET_SIZE_BASE * 1.2)  # Space for widgets on left
         
         # Use smaller cards for 4+ stops
         card_w = int(FIXED_CARD_W * 0.8)   # 20% smaller
         card_h = int(BAR_H * 0.8)          # 20% smaller
         margin = int(BAR_MARGIN * 0.6)     # Smaller margins
         
-        if available_width >= 2 * card_w + margin:
-            # 2x2 grid on right
-            grid_w = 2 * card_w + margin
-            grid_h = 2 * card_h + margin
-            start_x = widget_space + int(info.current_w * 0.03)
-            start_y = (info.current_h - grid_h) // 2
-            
-            for i in range(min(4, num_stops)):
-                row, col = i // 2, i % 2
-                x = start_x + col * (card_w + margin)
-                y = start_y + row * (card_h + margin)
-                positions.append((x, y))
-        else:
-            # Single column if not enough width
-            start_x = widget_space + int(info.current_w * 0.03)
-            start_y = int(info.current_h * 0.1)
-            for i in range(min(4, num_stops)):
-                positions.append((start_x, start_y + i * (card_h + margin)))
+        # Right side for stop cards
+        right_margin = int(info.current_w * 0.05)
+        grid_w = 2 * card_w + margin
+        grid_h = 2 * card_h + margin
+        start_x = info.current_w - right_margin - grid_w
+        start_y = (info.current_h - grid_h) // 2
+        
+        # 2x2 grid
+        for i in range(min(4, num_stops)):
+            row, col = i // 2, i % 2
+            x = start_x + col * (card_w + margin)
+            y = start_y + row * (card_h + margin)
+            positions.append((x, y))
     return positions
 
 # ────────── Main loop ──────────
@@ -714,7 +702,15 @@ def main():
             
             positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
             for idx, (x, y) in enumerate(positions[:rows]):
-                draw_bar_at_pos(x, y, *results[idx], screen, COLS, FIXED_CARD_W, BAR_PADDING, ICON_SIZE, CARD_PADDING, BAR_H, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
+                # Use smaller cards for 3+ stops
+                if rows >= 3:
+                    card_w = int(FIXED_CARD_W * (0.85 if rows == 3 else 0.8))
+                    card_h = int(BAR_H * (0.85 if rows == 3 else 0.8))
+                else:
+                    card_w = FIXED_CARD_W
+                    card_h = BAR_H
+                    
+                draw_bar_at_pos(x, y, *results[idx], screen, COLS, card_w, BAR_PADDING, ICON_SIZE, CARD_PADDING, card_h, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
         pygame.display.flip()
         
         # Fetch based on interval
