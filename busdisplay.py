@@ -367,7 +367,7 @@ def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIG
     draw_rounded_rect(screen, CARD_BG, temp_rect, BORDER_RADIUS)
     
     # Temperature content with thermometer icon - centered together
-    temp_text = f"{weather_data['min_temp']}°-{weather_data['max_temp']}°C"
+    temp_text = f"Min: {weather_data['min_temp']}°C, Max: {weather_data['max_temp']}°C"
     temp_surf = font_temp.render(temp_text, True, TEXT_PRIMARY)
     
     # Calculate total width of icon + padding + text
