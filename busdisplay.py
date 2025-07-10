@@ -438,19 +438,16 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
             y = start_y + i * (BAR_H + BAR_MARGIN)
             positions.append((x, y))
     elif num_stops == 3:
-        # 3 stops: widgets left, stop cards right (2 on top, 1 centered below)
-        widget_space = int(GRID_WIDGET_WIDTH_BASE * 1.2)  # Space for thinner widgets on left
-        
+        # 3 stops: stop cards at top center (2 on top, 1 centered below)
         # Use grid mode card scaling for 3 stops
         card_w = int(FIXED_CARD_W * GRID_CARD_WIDTH_SCALE)
         card_h = int(BAR_H * GRID_CARD_HEIGHT_SCALE)
         margin = int(BAR_MARGIN * 0.7)     # Smaller margins
         
-        # Right side for stop cards
-        right_margin = int(info.current_w * 0.05)
+        # Center the grid at top
         grid_w = 2 * card_w + margin
-        start_x = info.current_w - right_margin - grid_w
-        start_y = int(info.current_h * 0.2)
+        start_x = (info.current_w - grid_w) // 2
+        start_y = int(info.current_h * 0.1)  # Top of screen
         
         # Two on top row
         positions.append((start_x, start_y))
@@ -459,20 +456,17 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
         bottom_x = start_x + (card_w + margin) // 2
         positions.append((bottom_x, start_y + card_h + margin))
     else:
-        # 4+ stops: widgets left, 2x2 grid right
-        widget_space = int(GRID_WIDGET_WIDTH_BASE * 1.2)  # Space for thinner widgets on left
-        
+        # 4+ stops: stop cards at top center in 2x2 grid
         # Use grid mode card scaling for 4+ stops
         card_w = int(FIXED_CARD_W * GRID_CARD_WIDTH_SCALE)
         card_h = int(BAR_H * GRID_CARD_HEIGHT_SCALE)
         margin = int(BAR_MARGIN * 0.6)     # Smaller margins
         
-        # Right side for stop cards
-        right_margin = int(info.current_w * 0.05)
+        # Center the 2x2 grid at top
         grid_w = 2 * card_w + margin
         grid_h = 2 * card_h + margin
-        start_x = info.current_w - right_margin - grid_w
-        start_y = (info.current_h - grid_h) // 2
+        start_x = (info.current_w - grid_w) // 2
+        start_y = int(info.current_h * 0.1)  # Top of screen
         
         # 2x2 grid
         for i in range(min(4, num_stops)):
@@ -683,14 +677,23 @@ def main():
                     # Weather condition widget
                     draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
             else:
-                # 3+ stops: widgets stacked on left, stop cards on right (grid mode)
-                left_margin = int(info.current_w * 0.05)
-                widget_start_y = int(info.current_h * 0.2)
-                current_y = widget_start_y
+                # 3+ stops: stop cards at top center, widgets side by side at bottom (grid mode)
+                widgets_y = int(info.current_h * 0.8)  # Bottom of screen
+                
+                # Calculate total width needed for all widgets
+                widget_count = 0
+                if SHOW_CLOCK:
+                    widget_count += 1
+                if SHOW_WEATHER and weather_data:
+                    widget_count += 2  # Temperature + weather condition
+                
+                total_widget_width = widget_count * GRID_WIDGET_WIDTH + (widget_count - 1) * BAR_MARGIN
+                start_x = (info.current_w - total_widget_width) // 2
+                current_x = start_x
                 
                 if SHOW_CLOCK:
-                    # Draw clock widget on left (using grid dimensions)
-                    clock_rect = (left_margin, current_y, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT)
+                    # Draw clock widget (using grid dimensions)
+                    clock_rect = (current_x, widgets_y, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT)
                     draw_shadow(screen, clock_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
                     draw_rounded_rect(screen, CARD_BG, clock_rect, BORDER_RADIUS)
                     
@@ -700,27 +703,27 @@ def main():
                     
                     # Center clock icon and text together
                     total_content_width = ICON_SIZE + CARD_PADDING + time_surf.get_width()
-                    content_start_x = left_margin + (GRID_WIDGET_WIDTH - total_content_width) // 2
+                    content_start_x = current_x + (GRID_WIDGET_WIDTH - total_content_width) // 2
                     
                     # Draw icon and text centered
                     icon_x = content_start_x
-                    icon_y = current_y + (GRID_WIDGET_HEIGHT - ICON_SIZE) // 2
+                    icon_y = widgets_y + (GRID_WIDGET_HEIGHT - ICON_SIZE) // 2
                     screen.blit(clock_img, (icon_x, icon_y))
                     
                     time_x = icon_x + ICON_SIZE + CARD_PADDING
-                    time_y = current_y + (GRID_WIDGET_HEIGHT - time_surf.get_height()) // 2
+                    time_y = widgets_y + (GRID_WIDGET_HEIGHT - time_surf.get_height()) // 2
                     screen.blit(time_surf, (time_x, time_y))
                     
-                    current_y += GRID_WIDGET_HEIGHT + BAR_MARGIN
+                    current_x += GRID_WIDGET_WIDTH + BAR_MARGIN
                 
-                # Weather widgets stacked below clock on left (using grid dimensions)
+                # Weather widgets side by side with clock at bottom (using grid dimensions)
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(left_margin, current_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
-                    current_y += GRID_WIDGET_HEIGHT + BAR_MARGIN
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
+                    current_x += GRID_WIDGET_WIDTH + BAR_MARGIN
                     
                     # Weather condition widget
-                    draw_weather_condition_widget(left_margin, current_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
+                    draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
             
             positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
             for idx, (x, y) in enumerate(positions[:rows]):
