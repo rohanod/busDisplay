@@ -48,6 +48,12 @@ DEFAULT_CLOCK_TEXT_SIZE = 36
 DEFAULT_TEMP_TEXT_SIZE = 36
 DEFAULT_WEATHER_TEXT_SIZE = 28
 
+# Grid mode (3/4 stops) specific settings - configurable at top of script
+DEFAULT_GRID_WIDGET_WIDTH = 280   # Thinner widgets for grid mode
+DEFAULT_GRID_WIDGET_HEIGHT = 100  # Widget height for grid mode
+DEFAULT_GRID_CARD_WIDTH_SCALE = 0.9   # Stop card width scale for grid mode (0.9 = 10% smaller)
+DEFAULT_GRID_CARD_HEIGHT_SCALE = 0.9  # Stop card height scale for grid mode
+
 # ────────── Runtime Config ──────────
 CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
 
@@ -87,6 +93,12 @@ WIDGET_ICON_SIZE_BASE = config.get("widget_icon_size", DEFAULT_WIDGET_ICON_SIZE)
 CLOCK_TEXT_SIZE_BASE = DEFAULT_CLOCK_TEXT_SIZE    # Fine-tune at top of script
 TEMP_TEXT_SIZE_BASE = DEFAULT_TEMP_TEXT_SIZE      # Fine-tune at top of script  
 WEATHER_TEXT_SIZE_BASE = DEFAULT_WEATHER_TEXT_SIZE # Fine-tune at top of script
+
+# Grid mode settings - configurable at top of script only
+GRID_WIDGET_WIDTH_BASE = DEFAULT_GRID_WIDGET_WIDTH
+GRID_WIDGET_HEIGHT_BASE = DEFAULT_GRID_WIDGET_HEIGHT
+GRID_CARD_WIDTH_SCALE = DEFAULT_GRID_CARD_WIDTH_SCALE
+GRID_CARD_HEIGHT_SCALE = DEFAULT_GRID_CARD_HEIGHT_SCALE
 
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
@@ -427,11 +439,11 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
             positions.append((x, y))
     elif num_stops == 3:
         # 3 stops: widgets left, stop cards right (2 on top, 1 centered below)
-        widget_space = int(WIDGET_SIZE_BASE * 1.2)  # Space for widgets on left
+        widget_space = int(GRID_WIDGET_WIDTH_BASE * 1.2)  # Space for thinner widgets on left
         
-        # Use smaller cards for 3 stops
-        card_w = int(FIXED_CARD_W * 0.85)  # 15% smaller
-        card_h = int(BAR_H * 0.85)         # 15% smaller
+        # Use grid mode card scaling for 3 stops
+        card_w = int(FIXED_CARD_W * GRID_CARD_WIDTH_SCALE)
+        card_h = int(BAR_H * GRID_CARD_HEIGHT_SCALE)
         margin = int(BAR_MARGIN * 0.7)     # Smaller margins
         
         # Right side for stop cards
@@ -448,11 +460,11 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
         positions.append((bottom_x, start_y + card_h + margin))
     else:
         # 4+ stops: widgets left, 2x2 grid right
-        widget_space = int(WIDGET_SIZE_BASE * 1.2)  # Space for widgets on left
+        widget_space = int(GRID_WIDGET_WIDTH_BASE * 1.2)  # Space for thinner widgets on left
         
-        # Use smaller cards for 4+ stops
-        card_w = int(FIXED_CARD_W * 0.8)   # 20% smaller
-        card_h = int(BAR_H * 0.8)          # 20% smaller
+        # Use grid mode card scaling for 4+ stops
+        card_w = int(FIXED_CARD_W * GRID_CARD_WIDTH_SCALE)
+        card_h = int(BAR_H * GRID_CARD_HEIGHT_SCALE)
         margin = int(BAR_MARGIN * 0.6)     # Smaller margins
         
         # Right side for stop cards
@@ -519,14 +531,18 @@ def main():
     BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     
-    # Widget dimensions (all widgets same size)
+    # Widget dimensions
     WIDGET_SIZE = int(WIDGET_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
-    WIDGET_HEIGHT = int(WIDGET_SIZE * 0.4)  # All widgets same height
+    WIDGET_HEIGHT = int(WIDGET_SIZE * 0.4)  # Normal widget height
     WIDGET_TEXT_SIZE = int(WIDGET_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     WIDGET_ICON_SIZE = int(WIDGET_ICON_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     CLOCK_TEXT_SIZE = int(CLOCK_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     TEMP_TEXT_SIZE = int(TEMP_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     WEATHER_TEXT_SIZE = int(WEATHER_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    
+    # Grid mode widget dimensions (for 3/4 stops)
+    GRID_WIDGET_WIDTH = int(GRID_WIDGET_WIDTH_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    GRID_WIDGET_HEIGHT = int(GRID_WIDGET_HEIGHT_BASE * SCALE_MULTIPLIER * scale * grid_scale)
 
     
     # Initialize fonts and images after scaling is calculated
@@ -667,45 +683,51 @@ def main():
                     # Weather condition widget
                     draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
             else:
-                # 3+ stops: widgets stacked on left, stop cards on right
+                # 3+ stops: widgets stacked on left, stop cards on right (grid mode)
                 left_margin = int(info.current_w * 0.05)
                 widget_start_y = int(info.current_h * 0.2)
                 current_y = widget_start_y
                 
                 if SHOW_CLOCK:
-                    # Draw clock widget on left
-                    clock_rect = (left_margin, current_y, WIDGET_SIZE, WIDGET_HEIGHT)
+                    # Draw clock widget on left (using grid dimensions)
+                    clock_rect = (left_margin, current_y, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT)
                     draw_shadow(screen, clock_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
                     draw_rounded_rect(screen, CARD_BG, clock_rect, BORDER_RADIUS)
                     
-                    # Clock content
-                    icon_x = left_margin + BAR_PADDING
-                    icon_y = current_y + (WIDGET_HEIGHT - ICON_SIZE) // 2
+                    # Clock content - centered
+                    current_time_str = now.strftime("%H:%M:%S")
+                    time_surf = font_clock_widget.render(current_time_str, True, ACCENT_COLOR)
+                    
+                    # Center clock icon and text together
+                    total_content_width = ICON_SIZE + CARD_PADDING + time_surf.get_width()
+                    content_start_x = left_margin + (GRID_WIDGET_WIDTH - total_content_width) // 2
+                    
+                    # Draw icon and text centered
+                    icon_x = content_start_x
+                    icon_y = current_y + (GRID_WIDGET_HEIGHT - ICON_SIZE) // 2
                     screen.blit(clock_img, (icon_x, icon_y))
                     
-                    current_time_str = now.strftime("%H:%M:%S")
-                    time_surf = font_digital.render(current_time_str, True, ACCENT_COLOR)
                     time_x = icon_x + ICON_SIZE + CARD_PADDING
-                    time_y = current_y + (WIDGET_HEIGHT - time_surf.get_height()) // 2
+                    time_y = current_y + (GRID_WIDGET_HEIGHT - time_surf.get_height()) // 2
                     screen.blit(time_surf, (time_x, time_y))
                     
-                    current_y += WIDGET_HEIGHT + BAR_MARGIN
+                    current_y += GRID_WIDGET_HEIGHT + BAR_MARGIN
                 
-                # Weather widgets stacked below clock on left
+                # Weather widgets stacked below clock on left (using grid dimensions)
                 if SHOW_WEATHER and weather_data:
                     # Temperature widget
-                    draw_temperature_widget(left_margin, current_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
-                    current_y += WIDGET_HEIGHT + BAR_MARGIN
+                    draw_temperature_widget(left_margin, current_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img)
+                    current_y += GRID_WIDGET_HEIGHT + BAR_MARGIN
                     
                     # Weather condition widget
-                    draw_weather_condition_widget(left_margin, current_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
+                    draw_weather_condition_widget(left_margin, current_y, weather_data, screen, GRID_WIDGET_WIDTH, GRID_WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather_text, sun_img, rain_img)
             
             positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
             for idx, (x, y) in enumerate(positions[:rows]):
-                # Use smaller cards for 3+ stops
+                # Use grid mode card scaling for 3+ stops
                 if rows >= 3:
-                    card_w = int(FIXED_CARD_W * (0.85 if rows == 3 else 0.8))
-                    card_h = int(BAR_H * (0.85 if rows == 3 else 0.8))
+                    card_w = int(FIXED_CARD_W * GRID_CARD_WIDTH_SCALE)
+                    card_h = int(BAR_H * GRID_CARD_HEIGHT_SCALE)
                 else:
                     card_w = FIXED_CARD_W
                     card_h = BAR_H
