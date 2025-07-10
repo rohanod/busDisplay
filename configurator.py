@@ -27,10 +27,9 @@ DEFAULT_GRID_SHRINK = 0.7
 DEFAULT_ICON_LINE_MULTIPLIER = 1.0
 DEFAULT_HTTP_TIMEOUT = 10
 DEFAULT_FETCH_INTERVAL = 60
-DEFAULT_CLOCK_WIDGET_SIZE = 320
-DEFAULT_WEATHER_WIDGET_SIZE = 320
-DEFAULT_WEATHER_TEXT_SIZE = 36
-DEFAULT_WEATHER_ICON_SIZE = 48
+DEFAULT_WIDGET_SIZE = 320
+DEFAULT_WIDGET_TEXT_SIZE = 36
+DEFAULT_WIDGET_ICON_SIZE = 48
 
 ARRETS_CSV_URL = "https://raw.githubusercontent.com/rohanod/arrets/refs/heads/main/arrets.csv"
 DEFAULT_CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
@@ -48,8 +47,8 @@ DEFAULTS = {
     "grid_shrink": DEFAULT_GRID_SHRINK, "max_departures": 8, 
     "fetch_interval": DEFAULT_FETCH_INTERVAL, "http_timeout": DEFAULT_HTTP_TIMEOUT, 
     "max_minutes": 120, "show_clock": True, "show_weather": True,
-    "clock_widget_size": DEFAULT_CLOCK_WIDGET_SIZE, "weather_widget_size": DEFAULT_WEATHER_WIDGET_SIZE,
-    "weather_text_size": DEFAULT_WEATHER_TEXT_SIZE, "weather_icon_size": DEFAULT_WEATHER_ICON_SIZE
+    "widget_size": DEFAULT_WIDGET_SIZE, "widget_text_size": DEFAULT_WIDGET_TEXT_SIZE,
+    "widget_icon_size": DEFAULT_WIDGET_ICON_SIZE
 }
 
 # Config option descriptions for better UX
@@ -75,18 +74,17 @@ CONFIG_DESCRIPTIONS = {
     "http_timeout": "HTTP request timeout in seconds",
     "max_minutes": "Hide departures beyond X minutes",
     "show_clock": "Show current time widget",
-    "show_weather": "Show weather widget",
-    "clock_widget_size": "Clock widget size",
-    "weather_widget_size": "Weather widget size",
-    "weather_text_size": "Weather text font size",
-    "weather_icon_size": "Weather icon size"
+    "show_weather": "Show weather widgets (temperature + condition)",
+    "widget_size": "Widget size (all widgets)",
+    "widget_text_size": "Widget text font size",
+    "widget_icon_size": "Widget icon size"
 }
 
 # Categories for organized configuration
 CATEGORIES = {
     "Layout": ["cols", "rows", "bar_margin", "bar_padding", "card_padding", "border_radius", "shadow_offset"],
     "Sizing": ["cell_w", "bar_h", "minute_size", "now_size", "stop_name_size", "line_size", "icon_size", "icon_line_multiplier", "grid_shrink"],
-    "Widgets": ["show_clock", "show_weather", "clock_widget_size", "weather_widget_size", "weather_text_size", "weather_icon_size"],
+    "Widgets": ["show_clock", "show_weather", "widget_size", "widget_text_size", "widget_icon_size"],
     "API & Behavior": ["max_departures", "fetch_interval", "http_timeout", "max_minutes"]
 }
 

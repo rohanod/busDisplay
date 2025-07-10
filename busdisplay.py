@@ -41,10 +41,9 @@ DEFAULT_GRID_SHRINK        = 0.7
 DEFAULT_ICON_LINE_MULTIPLIER = 1.0
 DEFAULT_HTTP_TIMEOUT       = 10
 DEFAULT_FETCH_INTERVAL     = 60
-DEFAULT_CLOCK_WIDGET_SIZE = 320
-DEFAULT_WEATHER_WIDGET_SIZE = 320
-DEFAULT_WEATHER_TEXT_SIZE = 36
-DEFAULT_WEATHER_ICON_SIZE = 48
+DEFAULT_WIDGET_SIZE = 320
+DEFAULT_WIDGET_TEXT_SIZE = 36
+DEFAULT_WIDGET_ICON_SIZE = 48
 
 # ────────── Runtime Config ──────────
 CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
@@ -79,10 +78,9 @@ ICON_LINE_MULTIPLIER = config.get("icon_line_multiplier", DEFAULT_ICON_LINE_MULT
 BORDER_RADIUS_BASE = config.get("border_radius", DEFAULT_BORDER_RADIUS)
 SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
 GRID_SHRINK = config.get("grid_shrink", DEFAULT_GRID_SHRINK)
-CLOCK_WIDGET_SIZE_BASE = config.get("clock_widget_size", DEFAULT_CLOCK_WIDGET_SIZE)
-WEATHER_WIDGET_SIZE_BASE = config.get("weather_widget_size", DEFAULT_WEATHER_WIDGET_SIZE)
-WEATHER_TEXT_SIZE_BASE = config.get("weather_text_size", DEFAULT_WEATHER_TEXT_SIZE)
-WEATHER_ICON_SIZE_BASE = config.get("weather_icon_size", DEFAULT_WEATHER_ICON_SIZE)
+WIDGET_SIZE_BASE = config.get("widget_size", DEFAULT_WIDGET_SIZE)
+WIDGET_TEXT_SIZE_BASE = config.get("widget_text_size", DEFAULT_WIDGET_TEXT_SIZE)
+WIDGET_ICON_SIZE_BASE = config.get("widget_icon_size", DEFAULT_WIDGET_ICON_SIZE)
 
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
@@ -337,44 +335,50 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
         line_y = content_y + (3 * content_h // 4) - (line_surf.get_height() // 2)
         screen.blit(line_surf, (line_x, line_y))
 
-def draw_weather_widget(x, y, weather_data, screen, WEATHER_WIDGET_SIZE, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather, sun_img, rain_img):
-    """Draw weather widget"""
+def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget):
+    """Draw temperature widget"""
     if not weather_data:
         return
     
-    widget_height = int(WEATHER_WIDGET_SIZE * 0.6)  # Height is 60% of size
+    # Draw shadow
+    temp_rect = (x, y, WIDGET_SIZE, WIDGET_HEIGHT)
+    draw_shadow(screen, temp_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
+    
+    # Draw main card
+    draw_rounded_rect(screen, CARD_BG, temp_rect, BORDER_RADIUS)
+    
+    # Temperature content
+    temp_text = f"{weather_data['min_temp']}°-{weather_data['max_temp']}°C"
+    temp_surf = font_widget.render(temp_text, True, TEXT_PRIMARY)
+    temp_x = x + (WIDGET_SIZE - temp_surf.get_width()) // 2
+    temp_y = y + (WIDGET_HEIGHT - temp_surf.get_height()) // 2
+    screen.blit(temp_surf, (temp_x, temp_y))
+
+def draw_weather_condition_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget, sun_img, rain_img):
+    """Draw weather condition widget"""
+    if not weather_data:
+        return
     
     # Draw shadow
-    weather_rect = (x, y, WEATHER_WIDGET_SIZE, widget_height)
+    weather_rect = (x, y, WIDGET_SIZE, WIDGET_HEIGHT)
     draw_shadow(screen, weather_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
     
     # Draw main card
     draw_rounded_rect(screen, CARD_BG, weather_rect, BORDER_RADIUS)
     
-    # Weather content
-    content_y = y + BAR_PADDING
-    content_h = widget_height - (BAR_PADDING * 2)
-    
     # Weather icon (sun or rain)
     weather_icon = rain_img if weather_data['will_rain'] else sun_img
     icon_x = x + BAR_PADDING
-    icon_y = y + (widget_height - weather_icon.get_height()) // 2
+    icon_y = y + (WIDGET_HEIGHT - weather_icon.get_height()) // 2
     screen.blit(weather_icon, (icon_x, icon_y))
     
-    # Temperature range
-    temp_text = f"{weather_data['min_temp']}°-{weather_data['max_temp']}°C"
-    temp_surf = font_weather.render(temp_text, True, TEXT_PRIMARY)
-    temp_x = icon_x + weather_icon.get_width() + CARD_PADDING
-    temp_y = content_y
-    screen.blit(temp_surf, (temp_x, temp_y))
-    
-    # Rain status
-    rain_text = "Rain" if weather_data['will_rain'] else "Sunny"
-    rain_color = BLUE if weather_data['will_rain'] else ORANGE
-    rain_surf = font_weather.render(rain_text, True, rain_color)
-    rain_x = temp_x
-    rain_y = temp_y + temp_surf.get_height() + 5
-    screen.blit(rain_surf, (rain_x, rain_y))
+    # Weather status text
+    weather_text = "Rain" if weather_data['will_rain'] else "Sunny"
+    weather_color = BLUE if weather_data['will_rain'] else ORANGE
+    weather_surf = font_widget.render(weather_text, True, weather_color)
+    text_x = icon_x + weather_icon.get_width() + CARD_PADDING
+    text_y = y + (WIDGET_HEIGHT - weather_surf.get_height()) // 2
+    screen.blit(weather_surf, (text_x, text_y))
 
 def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
     positions = []
@@ -395,7 +399,7 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
             positions.append((x, y))
     elif num_stops == 3:
         # 3 stops: widgets on left, stops on right
-        widget_space = int(WEATHER_WIDGET_SIZE_BASE * 1.2)  # Space for widgets
+        widget_space = int(WIDGET_SIZE_BASE * 1.2)  # Space for widgets
         available_width = info.current_w - widget_space - int(info.current_w * 0.1)  # Leave margins
         
         if available_width >= 2 * FIXED_CARD_W + BAR_MARGIN:
@@ -416,7 +420,7 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
                 positions.append((start_x, start_y + i * (BAR_H + BAR_MARGIN)))
     else:
         # 4+ stops: widgets on left, 2x2 grid on right
-        widget_space = int(WEATHER_WIDGET_SIZE_BASE * 1.2)  # Space for widgets
+        widget_space = int(WIDGET_SIZE_BASE * 1.2)  # Space for widgets
         available_width = info.current_w - widget_space - int(info.current_w * 0.1)
         
         if available_width >= 2 * FIXED_CARD_W + BAR_MARGIN:
@@ -441,7 +445,7 @@ def get_layout_positions(num_stops, info, BAR_H, BAR_MARGIN, FIXED_CARD_W):
 # ────────── Main loop ──────────
 
 def main():
-    global screen, info, font_now, font_stop, font_line, font_clock, font_digital, font_weather, clock_img, tram_img, sun_img, rain_img
+    global screen, info, font_now, font_stop, font_line, font_clock, font_digital, font_widget, clock_img, tram_img, sun_img, rain_img
     
     # ────────── Pygame init ──────────
     log.info(f"DISPLAY environment: {os.environ.get('DISPLAY', 'Not set')}")
@@ -487,11 +491,11 @@ def main():
     BORDER_RADIUS = int(BORDER_RADIUS_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     SHADOW_OFFSET = int(SHADOW_OFFSET_BASE * SCALE_MULTIPLIER * scale * grid_scale)
     
-    # Widget dimensions
-    CLOCK_WIDGET_SIZE = int(CLOCK_WIDGET_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
-    WEATHER_WIDGET_SIZE = int(WEATHER_WIDGET_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
-    WEATHER_TEXT_SIZE = int(WEATHER_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
-    WEATHER_ICON_SIZE = int(WEATHER_ICON_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    # Widget dimensions (all widgets same size)
+    WIDGET_SIZE = int(WIDGET_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    WIDGET_HEIGHT = int(WIDGET_SIZE * 0.4)  # All widgets same height
+    WIDGET_TEXT_SIZE = int(WIDGET_TEXT_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
+    WIDGET_ICON_SIZE = int(WIDGET_ICON_SIZE_BASE * SCALE_MULTIPLIER * scale * grid_scale)
 
     
     # Initialize fonts and images after scaling is calculated
@@ -501,7 +505,7 @@ def main():
     font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
     font_clock = pygame.font.SysFont("DejaVuSans", int(STOP_NAME_SIZE * 0.8), bold=True)
     font_digital = pygame.font.SysFont("Courier", int(STOP_NAME_SIZE * 0.6), bold=True)  # Digital clock font
-    font_weather = pygame.font.SysFont("DejaVuSans", WEATHER_TEXT_SIZE, bold=True)
+    font_widget = pygame.font.SysFont("DejaVuSans", WIDGET_TEXT_SIZE, bold=True)
     
     # Fixed card dimensions
     global FIXED_CARD_W
@@ -509,8 +513,8 @@ def main():
     
     clock_img = _load_svg(CLOCK_SVG_FILE, ICON_SIZE, ICON_SIZE)
     tram_img  = _load_svg(TRAM_SVG_FILE, ICON_SIZE, ICON_SIZE)
-    sun_img   = _load_svg(SUN_SVG_FILE, WEATHER_ICON_SIZE, WEATHER_ICON_SIZE)
-    rain_img  = _load_svg(RAIN_SVG_FILE, WEATHER_ICON_SIZE, WEATHER_ICON_SIZE)
+    sun_img   = _load_svg(SUN_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
+    rain_img  = _load_svg(RAIN_SVG_FILE, WIDGET_ICON_SIZE, WIDGET_ICON_SIZE)
     
     frame_count = 0
     last_fetch = 0
@@ -545,116 +549,121 @@ def main():
             if rows == 1:
                 # Single stop: widgets at bottom next to each other
                 widgets_y = int(info.current_h * 0.8)
-                clock_height = int(CLOCK_WIDGET_SIZE * 0.4)
-                weather_height = int(WEATHER_WIDGET_SIZE * 0.6)
                 
-                # Calculate total width needed for both widgets
-                total_widget_width = 0
+                # Calculate total width needed for all widgets
+                widget_count = 0
                 if SHOW_CLOCK:
-                    total_widget_width += CLOCK_WIDGET_SIZE
+                    widget_count += 1
                 if SHOW_WEATHER and weather_data:
-                    if total_widget_width > 0:
-                        total_widget_width += BAR_MARGIN  # Space between widgets
-                    total_widget_width += WEATHER_WIDGET_SIZE
+                    widget_count += 2  # Temperature + weather condition
                 
-                # Center both widgets
+                total_widget_width = widget_count * WIDGET_SIZE + (widget_count - 1) * BAR_MARGIN
                 start_x = (info.current_w - total_widget_width) // 2
                 current_x = start_x
                 
                 if SHOW_CLOCK:
                     # Draw clock widget
-                    clock_rect = (current_x, widgets_y, CLOCK_WIDGET_SIZE, clock_height)
+                    clock_rect = (current_x, widgets_y, WIDGET_SIZE, WIDGET_HEIGHT)
                     draw_shadow(screen, clock_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
                     draw_rounded_rect(screen, CARD_BG, clock_rect, BORDER_RADIUS)
                     
                     # Clock content
                     icon_x = current_x + BAR_PADDING
-                    icon_y = widgets_y + (clock_height - ICON_SIZE) // 2
+                    icon_y = widgets_y + (WIDGET_HEIGHT - ICON_SIZE) // 2
                     screen.blit(clock_img, (icon_x, icon_y))
                     
                     current_time_str = now.strftime("%H:%M:%S")
                     time_surf = font_digital.render(current_time_str, True, ACCENT_COLOR)
                     time_x = icon_x + ICON_SIZE + CARD_PADDING
-                    time_y = widgets_y + (clock_height - time_surf.get_height()) // 2
+                    time_y = widgets_y + (WIDGET_HEIGHT - time_surf.get_height()) // 2
                     screen.blit(time_surf, (time_x, time_y))
                     
-                    current_x += CLOCK_WIDGET_SIZE + BAR_MARGIN
+                    current_x += WIDGET_SIZE + BAR_MARGIN
                 
-                # Weather widget next to clock
+                # Weather widgets next to clock
                 if SHOW_WEATHER and weather_data:
-                    draw_weather_widget(current_x, widgets_y, weather_data, screen, WEATHER_WIDGET_SIZE, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather, sun_img, rain_img)
+                    # Temperature widget
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget)
+                    current_x += WIDGET_SIZE + BAR_MARGIN
+                    
+                    # Weather condition widget
+                    draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget, sun_img, rain_img)
                     
             elif rows == 2:
                 # Two stops: widgets at bottom next to each other
                 widgets_y = int(info.current_h * 0.8)
-                clock_height = int(CLOCK_WIDGET_SIZE * 0.4)
-                weather_height = int(WEATHER_WIDGET_SIZE * 0.6)
                 
-                # Calculate total width needed for both widgets
-                total_widget_width = 0
+                # Calculate total width needed for all widgets
+                widget_count = 0
                 if SHOW_CLOCK:
-                    total_widget_width += CLOCK_WIDGET_SIZE
+                    widget_count += 1
                 if SHOW_WEATHER and weather_data:
-                    if total_widget_width > 0:
-                        total_widget_width += BAR_MARGIN  # Space between widgets
-                    total_widget_width += WEATHER_WIDGET_SIZE
+                    widget_count += 2  # Temperature + weather condition
                 
-                # Center both widgets
+                total_widget_width = widget_count * WIDGET_SIZE + (widget_count - 1) * BAR_MARGIN
                 start_x = (info.current_w - total_widget_width) // 2
                 current_x = start_x
                 
                 if SHOW_CLOCK:
                     # Draw clock widget
-                    clock_rect = (current_x, widgets_y, CLOCK_WIDGET_SIZE, clock_height)
+                    clock_rect = (current_x, widgets_y, WIDGET_SIZE, WIDGET_HEIGHT)
                     draw_shadow(screen, clock_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
                     draw_rounded_rect(screen, CARD_BG, clock_rect, BORDER_RADIUS)
                     
                     # Clock content
                     icon_x = current_x + BAR_PADDING
-                    icon_y = widgets_y + (clock_height - ICON_SIZE) // 2
+                    icon_y = widgets_y + (WIDGET_HEIGHT - ICON_SIZE) // 2
                     screen.blit(clock_img, (icon_x, icon_y))
                     
                     current_time_str = now.strftime("%H:%M:%S")
                     time_surf = font_digital.render(current_time_str, True, ACCENT_COLOR)
                     time_x = icon_x + ICON_SIZE + CARD_PADDING
-                    time_y = widgets_y + (clock_height - time_surf.get_height()) // 2
+                    time_y = widgets_y + (WIDGET_HEIGHT - time_surf.get_height()) // 2
                     screen.blit(time_surf, (time_x, time_y))
                     
-                    current_x += CLOCK_WIDGET_SIZE + BAR_MARGIN
+                    current_x += WIDGET_SIZE + BAR_MARGIN
                 
-                # Weather widget next to clock
+                # Weather widgets next to clock
                 if SHOW_WEATHER and weather_data:
-                    draw_weather_widget(current_x, widgets_y, weather_data, screen, WEATHER_WIDGET_SIZE, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather, sun_img, rain_img)
+                    # Temperature widget
+                    draw_temperature_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget)
+                    current_x += WIDGET_SIZE + BAR_MARGIN
+                    
+                    # Weather condition widget
+                    draw_weather_condition_widget(current_x, widgets_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget, sun_img, rain_img)
             else:
-                # 3+ stops: widgets on left, stop cards on right
+                # 3+ stops: widgets stacked on left, stop cards on right
                 left_margin = int(info.current_w * 0.05)
                 widget_start_y = int(info.current_h * 0.2)
-                clock_height = int(CLOCK_WIDGET_SIZE * 0.4)
-                weather_height = int(WEATHER_WIDGET_SIZE * 0.6)
                 current_y = widget_start_y
                 
                 if SHOW_CLOCK:
                     # Draw clock widget on left
-                    clock_rect = (left_margin, current_y, CLOCK_WIDGET_SIZE, clock_height)
+                    clock_rect = (left_margin, current_y, WIDGET_SIZE, WIDGET_HEIGHT)
                     draw_shadow(screen, clock_rect, SHADOW_OFFSET, CARD_SHADOW, BORDER_RADIUS)
                     draw_rounded_rect(screen, CARD_BG, clock_rect, BORDER_RADIUS)
                     
                     # Clock content
                     icon_x = left_margin + BAR_PADDING
-                    icon_y = current_y + (clock_height - ICON_SIZE) // 2
+                    icon_y = current_y + (WIDGET_HEIGHT - ICON_SIZE) // 2
                     screen.blit(clock_img, (icon_x, icon_y))
                     
                     current_time_str = now.strftime("%H:%M:%S")
                     time_surf = font_digital.render(current_time_str, True, ACCENT_COLOR)
                     time_x = icon_x + ICON_SIZE + CARD_PADDING
-                    time_y = current_y + (clock_height - time_surf.get_height()) // 2
+                    time_y = current_y + (WIDGET_HEIGHT - time_surf.get_height()) // 2
                     screen.blit(time_surf, (time_x, time_y))
                     
-                    current_y += clock_height + BAR_MARGIN
+                    current_y += WIDGET_HEIGHT + BAR_MARGIN
                 
-                # Weather widget below clock on left
+                # Weather widgets stacked below clock on left
                 if SHOW_WEATHER and weather_data:
-                    draw_weather_widget(left_margin, current_y, weather_data, screen, WEATHER_WIDGET_SIZE, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_weather, sun_img, rain_img)
+                    # Temperature widget
+                    draw_temperature_widget(left_margin, current_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget)
+                    current_y += WIDGET_HEIGHT + BAR_MARGIN
+                    
+                    # Weather condition widget
+                    draw_weather_condition_widget(left_margin, current_y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_widget, sun_img, rain_img)
             
             positions = get_layout_positions(rows, info, BAR_H, BAR_MARGIN, FIXED_CARD_W)
             for idx, (x, y) in enumerate(positions[:rows]):
