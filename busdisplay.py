@@ -51,8 +51,8 @@ DEFAULT_WEATHER_TEXT_SIZE = 28
 # Grid mode (3/4 stops) specific settings - configurable at top of script
 DEFAULT_GRID_WIDGET_WIDTH = 280   # Thinner widgets for grid mode
 DEFAULT_GRID_WIDGET_HEIGHT = 100  # Widget height for grid mode
-DEFAULT_GRID_CARD_WIDTH_SCALE = 0.9   # Stop card width scale for grid mode (0.9 = 10% smaller)
-DEFAULT_GRID_CARD_HEIGHT_SCALE = 0.9  # Stop card height scale for grid mode
+DEFAULT_GRID_CARD_WIDTH_SCALE = 0.85   # Stop card width scale for grid mode
+DEFAULT_GRID_CARD_HEIGHT_SCALE = 0.85  # Stop card height scale for grid mode
 
 # ────────── Runtime Config ──────────
 CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
