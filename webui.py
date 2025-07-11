@@ -262,6 +262,23 @@ def download_backup(filename):
 
 if __name__ == '__main__':
     ensure_config_dir()
-    print("Starting Bus Display Web UI...")
-    print("Access the interface at: http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    # Setup logging to file
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s %(message)s',
+        handlers=[
+            logging.FileHandler(os.path.expanduser('~/busdisplay/webui.log')),
+            logging.StreamHandler()
+        ]
+    )
+    
+    log.info("Starting Bus Display Web UI...")
+    log.info("Access the interface at: http://localhost:5000")
+    
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=False)
+    except Exception as e:
+        log.error(f"Failed to start web UI: {e}")
+        sys.exit(1)

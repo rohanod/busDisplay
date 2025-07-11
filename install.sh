@@ -40,6 +40,11 @@ echo "Setting up Python environment..."
 cd "$INSTALL_DIR"
 bash setup_env.sh
 
+# Install web UI dependencies
+echo "Installing web UI dependencies..."
+source venv/bin/activate
+pip install -q -r webui_requirements.txt
+
 # Create config directory and default config file
 echo "Creating configuration directory..."
 mkdir -p "$CONFIG_DIR"
@@ -72,11 +77,13 @@ echo "Creating xinitrc..."
 sed "s|__HOME__|${USER_HOME}|g" xinitrc.example > "${USER_HOME}/.xinitrc"
 chmod +x "${USER_HOME}/.xinitrc"
 
-# Install and enable systemd service
-echo "Installing systemd service..."
+# Install and enable systemd services
+echo "Installing systemd services..."
 sed -e "s|__USER__|${USER_NAME}|g" -e "s|__HOME__|${USER_HOME}|g" busdisplay.service | sudo tee /etc/systemd/system/busdisplay.service > /dev/null
+sed -e "s|__USER__|${USER_NAME}|g" -e "s|__HOME__|${USER_HOME}|g" webui.service | sudo tee /etc/systemd/system/webui.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable busdisplay.service
+# Don't enable webui.service - busdisplay.py will control it
 
 echo "Installation complete!"
 echo ""

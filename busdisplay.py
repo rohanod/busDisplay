@@ -186,18 +186,44 @@ def get_network_info():
         return "Unknown Network", "Unknown IP"
 
 def start_webui_background():
-    """Start the web UI in the background"""
+    """Start the web UI service in the background"""
     try:
-        webui_path = os.path.join(os.path.dirname(__file__), "webui.py")
-        if os.path.exists(webui_path):
-            log.info("Starting web UI in background...")
-            subprocess.Popen([sys.executable, webui_path], 
-                           stdout=subprocess.DEVNULL, 
-                           stderr=subprocess.DEVNULL)
+        # Check if webui service exists
+        result = subprocess.run(['systemctl', 'list-unit-files', 'webui.service'], 
+                              capture_output=True, text=True)
+        if 'webui.service' not in result.stdout:
+            log.warning("Web UI service not found, cannot start web interface")
+            return
+        
+        # Check if webui service is already active
+        result = subprocess.run(['systemctl', 'is-active', 'webui'], 
+                              capture_output=True, text=True)
+        if result.stdout.strip() == 'active':
+            log.info("Web UI service is already running")
+            return
+        
+        # Start the webui service
+        log.info("Starting web UI service...")
+        result = subprocess.run(['sudo', 'systemctl', 'start', 'webui'], 
+                               capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            log.info("Web UI service started successfully")
+            # Give it a moment to start
+            time.sleep(2)
+            
+            # Verify it's running
+            result = subprocess.run(['systemctl', 'is-active', 'webui'], 
+                                  capture_output=True, text=True)
+            if result.stdout.strip() == 'active':
+                log.info("Web UI service confirmed running")
+            else:
+                log.warning("Web UI service may not have started properly")
         else:
-            log.warning("Web UI not found at expected path")
+            log.error(f"Failed to start web UI service: {result.stderr}")
+            
     except Exception as e:
-        log.error(f"Failed to start web UI: {e}")
+        log.error(f"Failed to start web UI service: {e}")
 
 def draw_setup_screen(screen, info, font_stop, font_minute):
     """Draw the setup instructions screen"""
@@ -206,10 +232,16 @@ def draw_setup_screen(screen, info, font_stop, font_minute):
     wifi_name, ip_address = get_network_info()
     port = "5000"
     
-    # Create smaller fonts for setup screen
-    title_font = pygame.font.SysFont("DejaVuSans", int(font_stop.get_height() * 0.7), bold=True)
-    instruction_font = pygame.font.SysFont("DejaVuSans", int(font_minute.get_height() * 0.6), bold=False)
-    footer_font = pygame.font.SysFont("DejaVuSans", int(font_minute.get_height() * 0.5), bold=False)
+    # Create smaller fonts for setup screen - use default font to avoid fc-list timeout
+    try:
+        title_font = pygame.font.Font(None, int(font_stop.get_height() * 0.7))
+        instruction_font = pygame.font.Font(None, int(font_minute.get_height() * 0.6))
+        footer_font = pygame.font.Font(None, int(font_minute.get_height() * 0.5))
+    except:
+        # Fallback to existing fonts if font creation fails
+        title_font = font_stop
+        instruction_font = font_minute
+        footer_font = font_minute
     
     # Title
     title_text = "Config not found. Please follow these steps to make config:"
@@ -240,7 +272,7 @@ def draw_setup_screen(screen, info, font_stop, font_minute):
         y_offset += line_height
     
     # Footer note
-    footer_text = "The web interface is starting in the background..."
+    footer_text = "The web interface service is starting in the background..."
     footer_surf = footer_font.render(footer_text, True, TEXT_SECONDARY)
     footer_x = (info.current_w - footer_surf.get_width()) // 2
     footer_y = int(info.current_h * 0.85)
