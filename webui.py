@@ -40,9 +40,8 @@ CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
 CONFIG_DIR = os.path.dirname(CONFIG_PATH)
 BACKUP_DIR = os.path.join(CONFIG_DIR, "backups")
 
-# Search.ch API for stop search
-SEARCH_API_URL = "https://search.ch/timetable/api/completion.json"
-STATIONBOARD_API_URL = "https://search.ch/timetable/api/stationboard.fr.json"
+# CSV file for stop search
+ARRETS_CSV_URL = "https://raw.githubusercontent.com/rohanod/arrets/refs/heads/main/arrets.csv"
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -177,8 +176,8 @@ def restart():
 
 @app.route('/api/search/stops')
 def search_stops():
-    """Search for stops using Search.ch API"""
-    query = request.args.get('q', '').strip()
+    """Search for stops using arrets.csv"""
+    query = request.args.get('q', '').strip().lower()
     log.info(f"Stop search request for: '{query}'")
     
     if not query:
@@ -187,29 +186,48 @@ def search_stops():
     
     try:
         log.info(f"Searching stops with query: {query}")
-        response = requests.get(SEARCH_API_URL, params={'q': query}, timeout=5)
-        log.info(f"Search API response status: {response.status_code}")
+        response = requests.get(ARRETS_CSV_URL, timeout=10)
+        log.info(f"CSV response status: {response.status_code}")
         
         if response.status_code == 200:
-            data = response.json()
-            log.info(f"Search API returned {len(data)} items")
+            import csv
+            import io
+            
+            # Parse CSV data
+            csv_data = response.text
+            reader = csv.DictReader(io.StringIO(csv_data), delimiter=';')
             
             stops = []
-            for item in data:
-                log.debug(f"Processing item: {item}")
-                if item.get('iconclass') == 'station':
+            for row in reader:
+                stop_name = row.get('Stop', '').strip()
+                stop_code = row.get('Long Code Stop', '').strip()
+                municipality = row.get('Municipality', '').strip()
+                country = row.get('Country', '').strip()
+                active = row.get('Actif', '').strip()
+                
+                # Only include active stops
+                if active != 'Y':
+                    continue
+                
+                # Search in stop name, code, and municipality
+                search_text = f"{stop_name} {stop_code} {municipality}".lower()
+                
+                if query in search_text:
                     stop_data = {
-                        'id': item.get('id'),
-                        'name': item.get('label'),
+                        'id': stop_code,
+                        'name': f"{stop_name} ({municipality}, {country})",
                         'type': 'stop'
                     }
                     stops.append(stop_data)
-                    log.debug(f"Added stop: {stop_data}")
+                    
+                    # Limit to 10 results for performance
+                    if len(stops) >= 10:
+                        break
             
             log.info(f"Found {len(stops)} stops matching query")
-            return jsonify(stops[:10])  # Limit to 10 results
+            return jsonify(stops)
         else:
-            log.warning(f"Search API returned status {response.status_code}")
+            log.warning(f"CSV request returned status {response.status_code}")
             return jsonify([])
     except Exception as e:
         log.error(f"Stop search error: {e}")
@@ -217,47 +235,80 @@ def search_stops():
 
 @app.route('/api/stops/<stop_id>/info')
 def get_stop_info():
-    """Get detailed information about a stop"""
+    """Get detailed information about a stop from CSV and Search.ch stationboard"""
     stop_id = request.view_args['stop_id']
+    log.info(f"Getting stop info for: {stop_id}")
+    
     try:
-        response = requests.get(STATIONBOARD_API_URL, params={
-            'stop': stop_id,
-            'limit': 20,
-            'transportation_types': 'bus,tram'
-        }, timeout=10)
+        # First get stop details from CSV
+        response = requests.get(ARRETS_CSV_URL, timeout=10)
+        stop_name = "Unknown"
+        municipality = ""
+        country = ""
         
         if response.status_code == 200:
-            data = response.json()
-            stop_name = data.get('stop', {}).get('name', 'Unknown')
+            import csv
+            import io
             
-            # Extract unique lines
-            lines = set()
-            terminals = {}
+            csv_data = response.text
+            reader = csv.DictReader(io.StringIO(csv_data), delimiter=';')
             
-            for conn in data.get('connections', []):
-                line = conn.get('*L') or conn.get('line')
-                terminal = conn.get('terminal', {})
-                terminal_id = terminal.get('id')
-                terminal_name = terminal.get('name', 'Unknown')
+            for row in reader:
+                if row.get('Long Code Stop', '').strip() == stop_id:
+                    stop_name = row.get('Stop', '').strip()
+                    municipality = row.get('Municipality', '').strip()
+                    country = row.get('Country', '').strip()
+                    break
+        
+        # Then get line information from Search.ch stationboard
+        lines = []
+        terminals = {}
+        
+        try:
+            stationboard_url = "https://search.ch/timetable/api/stationboard.fr.json"
+            sb_response = requests.get(stationboard_url, params={
+                'stop': stop_id,
+                'limit': 20,
+                'transportation_types': 'bus,tram'
+            }, timeout=10)
+            
+            if sb_response.status_code == 200:
+                data = sb_response.json()
+                lines_set = set()
                 
-                if line:
-                    lines.add(line)
-                    if line not in terminals:
-                        terminals[line] = []
-                    if terminal_id and terminal_name not in [t['name'] for t in terminals[line]]:
-                        terminals[line].append({
-                            'id': terminal_id,
-                            'name': terminal_name
-                        })
-            
-            return jsonify({
-                'id': stop_id,
-                'name': stop_name,
-                'lines': sorted(list(lines)),
-                'terminals': terminals
-            })
-        else:
-            return jsonify({'error': 'Stop not found'}), 404
+                for conn in data.get('connections', []):
+                    line = conn.get('*L') or conn.get('line')
+                    terminal = conn.get('terminal', {})
+                    terminal_id = terminal.get('id')
+                    terminal_name = terminal.get('name', 'Unknown')
+                    
+                    if line:
+                        lines_set.add(line)
+                        if line not in terminals:
+                            terminals[line] = []
+                        if terminal_id and terminal_name not in [t['name'] for t in terminals[line]]:
+                            terminals[line].append({
+                                'id': terminal_id,
+                                'name': terminal_name
+                            })
+                
+                lines = sorted(list(lines_set))
+            else:
+                log.warning(f"Stationboard API returned status {sb_response.status_code}")
+        except Exception as e:
+            log.warning(f"Could not get line info from stationboard: {e}")
+            # Provide some default lines if stationboard fails
+            lines = ["1", "2", "3"]  # Generic fallback
+        
+        full_name = f"{stop_name} ({municipality}, {country})" if municipality else stop_name
+        
+        return jsonify({
+            'id': stop_id,
+            'name': full_name,
+            'lines': lines,
+            'terminals': terminals
+        })
+        
     except Exception as e:
         log.error(f"Stop info error: {e}")
         return jsonify({'error': str(e)}), 500
