@@ -206,9 +206,14 @@ def draw_setup_screen(screen, info, font_stop, font_minute):
     wifi_name, ip_address = get_network_info()
     port = "5000"
     
+    # Create smaller fonts for setup screen
+    title_font = pygame.font.SysFont("DejaVuSans", int(font_stop.get_height() * 0.7), bold=True)
+    instruction_font = pygame.font.SysFont("DejaVuSans", int(font_minute.get_height() * 0.6), bold=False)
+    footer_font = pygame.font.SysFont("DejaVuSans", int(font_minute.get_height() * 0.5), bold=False)
+    
     # Title
     title_text = "Config not found. Please follow these steps to make config:"
-    title_surf = font_stop.render(title_text, True, ACCENT_COLOR)
+    title_surf = title_font.render(title_text, True, ACCENT_COLOR)
     title_x = (info.current_w - title_surf.get_width()) // 2
     title_y = int(info.current_h * 0.15)
     screen.blit(title_surf, (title_x, title_y))
@@ -224,19 +229,19 @@ def draw_setup_screen(screen, info, font_stop, font_minute):
         "If you want, you can configure more things at the \"Display\" tab"
     ]
     
-    y_offset = title_y + title_surf.get_height() + 60
-    line_height = int(font_minute.get_height() * 1.5)
+    y_offset = title_y + title_surf.get_height() + 40
+    line_height = int(instruction_font.get_height() * 1.4)
     
     for instruction in instructions:
         if instruction.strip():  # Skip empty lines for spacing
-            instr_surf = font_minute.render(instruction, True, TEXT_PRIMARY)
+            instr_surf = instruction_font.render(instruction, True, TEXT_PRIMARY)
             instr_x = (info.current_w - instr_surf.get_width()) // 2
             screen.blit(instr_surf, (instr_x, y_offset))
         y_offset += line_height
     
     # Footer note
     footer_text = "The web interface is starting in the background..."
-    footer_surf = font_minute.render(footer_text, True, TEXT_SECONDARY)
+    footer_surf = footer_font.render(footer_text, True, TEXT_SECONDARY)
     footer_x = (info.current_w - footer_surf.get_width()) // 2
     footer_y = int(info.current_h * 0.85)
     screen.blit(footer_surf, (footer_x, footer_y))
