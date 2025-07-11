@@ -231,7 +231,7 @@ def fetch(stop):
             continue
         
         # Store departure info (ts already includes delay)
-        deps.append((ts, line, max(delta, 0), c["terminal"]["name"]))
+        deps.append((ts, line, max(delta, 0), c["terminal"]["name"], delay_minutes))
     deps.sort(key=lambda x: x[0])
     
     # Hide municipality from stop name if configured per stop
@@ -326,11 +326,15 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
     card_start_x = icon_x + ICON_SIZE + CARD_PADDING
     
     for i, dep_info in enumerate(deps[:cols]):
-        if len(dep_info) == 4:
+        if len(dep_info) == 5:
+            ts, ln, _, terminal_name, delay_minutes = dep_info
+        elif len(dep_info) == 4:
             ts, ln, _, terminal_name = dep_info
+            delay_minutes = 0
         else:
             ts, ln, _ = dep_info
             terminal_name = ""
+            delay_minutes = 0
         card_x = card_start_x + i * card_w
         
         # Recalculate minutes at display time
@@ -354,9 +358,13 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
         # Minutes (already includes delay since ts was adjusted in fetch())
         if mn > 0:
             min_text = str(mn)
+            if delay_minutes > 0:
+                min_text += " ⚠︎"
             min_surf = font_minute.render(min_text, True, text_color)
         else:
             min_text = "NOW"
+            if delay_minutes > 0:
+                min_text += " ⚠︎"
             min_surf = font_now.render(min_text, True, text_color)
         min_x = card_x + (card_w - min_surf.get_width()) // 2
         min_y = content_y + (content_h // 4) - (min_surf.get_height() // 2)
@@ -367,6 +375,7 @@ def draw_bar_at_pos(x, y, name, deps, screen, COLS, FIXED_CARD_W, BAR_PADDING, I
         line_x = card_x + (card_w - line_surf.get_width()) // 2
         line_y = content_y + (3 * content_h // 4) - (line_surf.get_height() // 2)
         screen.blit(line_surf, (line_x, line_y))
+        
 
 def draw_temperature_widget(x, y, weather_data, screen, WIDGET_SIZE, WIDGET_HEIGHT, SHADOW_OFFSET, BORDER_RADIUS, BAR_PADDING, CARD_PADDING, font_temp, thermometer_img, mintemp_img, maxtemp_img):
     """Draw temperature widget"""
