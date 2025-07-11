@@ -6,14 +6,11 @@ INSTALL_DIR="${USER_HOME}/busdisplay"
 
 echo "Uninstalling Bus Display..."
 
-# Stop and disable services
-echo "Stopping services..."
+# Stop and disable service
+echo "Stopping service..."
 sudo systemctl stop busdisplay.service || true
-sudo systemctl stop webui.service || true
 sudo systemctl disable busdisplay.service || true
-sudo systemctl disable webui.service || true
 sudo rm -f /etc/systemd/system/busdisplay.service
-sudo rm -f /etc/systemd/system/webui.service
 sudo systemctl daemon-reload
 
 # Restore getty on tty0

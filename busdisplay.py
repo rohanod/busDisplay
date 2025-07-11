@@ -186,44 +186,56 @@ def get_network_info():
         return "Unknown Network", "Unknown IP"
 
 def start_webui_background():
-    """Start the web UI service in the background"""
+    """Start the web UI directly as a Python process"""
     try:
-        # Check if webui service exists
-        result = subprocess.run(['systemctl', 'list-unit-files', 'webui.service'], 
-                              capture_output=True, text=True)
-        if 'webui.service' not in result.stdout:
-            log.warning("Web UI service not found, cannot start web interface")
-            return
+        # Check if webui is already running on port 5000
+        try:
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            result = sock.connect_ex(('localhost', 5000))
+            sock.close()
+            if result == 0:
+                log.info("Web UI is already running on port 5000")
+                return
+        except:
+            pass
         
-        # Check if webui service is already active
-        result = subprocess.run(['systemctl', 'is-active', 'webui'], 
-                              capture_output=True, text=True)
-        if result.stdout.strip() == 'active':
-            log.info("Web UI service is already running")
-            return
+        # Start web UI directly as a subprocess
+        webui_path = os.path.join(os.path.dirname(__file__), "webui.py")
+        venv_python = os.path.join(os.path.dirname(__file__), "venv", "bin", "python")
         
-        # Start the webui service
-        log.info("Starting web UI service...")
-        result = subprocess.run(['sudo', 'systemctl', 'start', 'webui'], 
-                               capture_output=True, text=True)
+        # Use venv python if available, otherwise system python
+        python_cmd = venv_python if os.path.exists(venv_python) else sys.executable
         
-        if result.returncode == 0:
-            log.info("Web UI service started successfully")
+        if os.path.exists(webui_path):
+            log.info("Starting web UI directly in background...")
+            
+            # Start web UI as background process
+            process = subprocess.Popen([python_cmd, webui_path], 
+                                     cwd=os.path.dirname(__file__),
+                                     stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL)
+            log.info(f"Web UI started with PID {process.pid}")
+            
             # Give it a moment to start
-            time.sleep(2)
+            time.sleep(3)
             
             # Verify it's running
-            result = subprocess.run(['systemctl', 'is-active', 'webui'], 
-                                  capture_output=True, text=True)
-            if result.stdout.strip() == 'active':
-                log.info("Web UI service confirmed running")
-            else:
-                log.warning("Web UI service may not have started properly")
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                result = sock.connect_ex(('localhost', 5000))
+                sock.close()
+                if result == 0:
+                    log.info("Web UI confirmed running on port 5000")
+                else:
+                    log.warning("Web UI may not have started properly")
+            except:
+                log.warning("Could not verify web UI status")
         else:
-            log.error(f"Failed to start web UI service: {result.stderr}")
+            log.warning(f"Web UI not found at expected path: {webui_path}")
             
     except Exception as e:
-        log.error(f"Failed to start web UI service: {e}")
+        log.error(f"Failed to start web UI: {e}")
 
 def draw_setup_screen(screen, info, font_stop, font_minute):
     """Draw the setup instructions screen"""
@@ -272,7 +284,7 @@ def draw_setup_screen(screen, info, font_stop, font_minute):
         y_offset += line_height
     
     # Footer note
-    footer_text = "The web interface service is starting in the background..."
+    footer_text = "The web interface is starting in the background..."
     footer_surf = footer_font.render(footer_text, True, TEXT_SECONDARY)
     footer_x = (info.current_w - footer_surf.get_width()) // 2
     footer_y = int(info.current_h * 0.85)

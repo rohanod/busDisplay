@@ -77,13 +77,11 @@ echo "Creating xinitrc..."
 sed "s|__HOME__|${USER_HOME}|g" xinitrc.example > "${USER_HOME}/.xinitrc"
 chmod +x "${USER_HOME}/.xinitrc"
 
-# Install and enable systemd services
-echo "Installing systemd services..."
+# Install and enable systemd service
+echo "Installing systemd service..."
 sed -e "s|__USER__|${USER_NAME}|g" -e "s|__HOME__|${USER_HOME}|g" busdisplay.service | sudo tee /etc/systemd/system/busdisplay.service > /dev/null
-sed -e "s|__USER__|${USER_NAME}|g" -e "s|__HOME__|${USER_HOME}|g" webui.service | sudo tee /etc/systemd/system/webui.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable busdisplay.service
-# Don't enable webui.service - busdisplay.py will control it
 
 echo "Installation complete!"
 echo ""
