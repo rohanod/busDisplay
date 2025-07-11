@@ -13,8 +13,23 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import requests
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+# Setup logging first thing - before any other operations
+LOG_FILE = os.path.expanduser("~/busdisplay/webui.log")
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+# Create log file if it doesn't exist
+if not os.path.exists(LOG_FILE):
+    with open(LOG_FILE, 'w') as f:
+        f.write(f"Web UI log started at {datetime.now()}\n")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()
+    ]
+)
 log = logging.getLogger("webui")
 
 app = Flask(__name__)
@@ -164,23 +179,37 @@ def restart():
 def search_stops():
     """Search for stops using Search.ch API"""
     query = request.args.get('q', '').strip()
+    log.info(f"Stop search request for: '{query}'")
+    
     if not query:
+        log.info("Empty query, returning empty results")
         return jsonify([])
     
     try:
+        log.info(f"Searching stops with query: {query}")
         response = requests.get(SEARCH_API_URL, params={'q': query}, timeout=5)
+        log.info(f"Search API response status: {response.status_code}")
+        
         if response.status_code == 200:
             data = response.json()
+            log.info(f"Search API returned {len(data)} items")
+            
             stops = []
             for item in data:
+                log.debug(f"Processing item: {item}")
                 if item.get('iconclass') == 'station':
-                    stops.append({
+                    stop_data = {
                         'id': item.get('id'),
                         'name': item.get('label'),
                         'type': 'stop'
-                    })
+                    }
+                    stops.append(stop_data)
+                    log.debug(f"Added stop: {stop_data}")
+            
+            log.info(f"Found {len(stops)} stops matching query")
             return jsonify(stops[:10])  # Limit to 10 results
         else:
+            log.warning(f"Search API returned status {response.status_code}")
             return jsonify([])
     except Exception as e:
         log.error(f"Stop search error: {e}")
@@ -261,21 +290,10 @@ def download_backup(filename):
         return jsonify({'error': str(e)}), 404
 
 if __name__ == '__main__':
-    ensure_config_dir()
-    
-    # Setup logging to file
-    import logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(levelname)s %(message)s',
-        handlers=[
-            logging.FileHandler(os.path.expanduser('~/busdisplay/webui.log')),
-            logging.StreamHandler()
-        ]
-    )
-    
     log.info("Starting Bus Display Web UI...")
     log.info("Access the interface at: http://localhost:5000")
+    
+    ensure_config_dir()
     
     try:
         app.run(host='0.0.0.0', port=5000, debug=False)

@@ -404,13 +404,16 @@ class BusDisplayUI {
 
     async selectStop(stopId, stopName) {
         try {
+            console.log('Selecting stop:', stopId, stopName);
+            
             // Hide search results
             document.getElementById('newStopResults').classList.remove('show');
             
-            // Clear search input
+            // Update search input
             document.getElementById('newStopSearch').value = stopName;
             
             // Load stop information
+            console.log('Fetching stop info for:', stopId);
             const response = await fetch(`/api/stops/${stopId}/info`);
             const stopInfo = await response.json();
 
@@ -418,10 +421,12 @@ class BusDisplayUI {
                 throw new Error(stopInfo.error);
             }
 
+            console.log('Stop info received:', stopInfo);
             this.selectedStop = stopInfo;
             this.showStopInfo();
             
         } catch (error) {
+            console.error('Error selecting stop:', error);
             this.showToast('Failed to load stop information: ' + error.message, 'error');
         }
     }
