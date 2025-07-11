@@ -5,17 +5,13 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=__USER__
-Group=__USER__
+User=root
 WorkingDirectory=__HOME__/busdisplay
-Environment=PATH=__HOME__/busdisplay/venv/bin
 ExecStart=__HOME__/busdisplay/venv/bin/python __HOME__/busdisplay/webui.py
 Restart=always
 RestartSec=10
 StandardOutput=append:__HOME__/busdisplay/webui.log
 StandardError=append:__HOME__/busdisplay/webui.log
-
-PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
