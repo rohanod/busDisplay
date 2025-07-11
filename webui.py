@@ -201,6 +201,7 @@ def search_stops():
             for row in reader:
                 stop_name = row.get('Stop', '').strip()
                 stop_code = row.get('Long Code Stop', '').strip()
+                didoc_code = row.get('Didoc Code', '').strip()
                 municipality = row.get('Municipality', '').strip()
                 country = row.get('Country', '').strip()
                 active = row.get('Actif', '').strip()
@@ -209,12 +210,16 @@ def search_stops():
                 if active != 'Y':
                     continue
                 
+                # Skip stops without Didoc Code (they won't work with Search.ch)
+                if not didoc_code:
+                    continue
+                
                 # Search in stop name, code, and municipality
                 search_text = f"{stop_name} {stop_code} {municipality}".lower()
                 
                 if query in search_text:
                     stop_data = {
-                        'id': stop_code,
+                        'id': didoc_code,
                         'name': f"{stop_name} ({municipality}, {country})",
                         'type': 'stop'
                     }
@@ -254,7 +259,7 @@ def get_stop_info():
             reader = csv.DictReader(io.StringIO(csv_data), delimiter=';')
             
             for row in reader:
-                if row.get('Long Code Stop', '').strip() == stop_id:
+                if row.get('Didoc Code', '').strip() == stop_id:
                     stop_name = row.get('Stop', '').strip()
                     municipality = row.get('Municipality', '').strip()
                     country = row.get('Country', '').strip()
