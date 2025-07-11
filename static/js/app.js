@@ -369,13 +369,20 @@ class BusDisplayUI {
 
         if (!query.trim()) {
             resultsElement.classList.remove('show');
+            // Reset the add button when search is cleared
+            const addButton = document.getElementById('confirmAddStop');
+            if (addButton) {
+                addButton.disabled = true;
+            }
             return;
         }
 
         this.searchTimeout = setTimeout(async () => {
             try {
+                console.log('Searching for:', query);
                 const response = await fetch(`/api/search/stops?q=${encodeURIComponent(query)}`);
                 const stops = await response.json();
+                console.log('Search results:', stops);
 
                 if (stops.length === 0) {
                     resultsElement.innerHTML = '<div class="search-result-item">No stops found</div>';
@@ -446,7 +453,12 @@ class BusDisplayUI {
         `;
 
         infoElement.style.display = 'block';
-        document.getElementById('confirmAddStop').disabled = false;
+        
+        // Enable the add button
+        const addButton = document.getElementById('confirmAddStop');
+        if (addButton) {
+            addButton.disabled = false;
+        }
         
         this.updateFilterConfig();
     }
