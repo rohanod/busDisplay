@@ -432,6 +432,15 @@ class BusDisplayUI {
             this.selectedStop = stopInfo;
             this.showStopInfo();
             
+            // Explicitly enable the add button
+            const addButton = document.getElementById('confirmAddStop');
+            if (addButton) {
+                addButton.disabled = false;
+                console.log('Add button enabled');
+            } else {
+                console.error('Add button not found');
+            }
+            
         } catch (error) {
             console.error('Error selecting stop:', error);
             this.showToast('Failed to load stop information: ' + error.message, 'error');
@@ -532,8 +541,14 @@ class BusDisplayUI {
         document.getElementById('newStopSearch').value = '';
         document.getElementById('newStopResults').classList.remove('show');
         document.getElementById('selectedStopInfo').style.display = 'none';
-        document.getElementById('confirmAddStop').disabled = true;
-        document.querySelector('input[name="filterType"][value="none"]').checked = true;
+        const addButton = document.getElementById('confirmAddStop');
+        if (addButton) {
+            addButton.disabled = true;
+        }
+        const noneFilter = document.querySelector('input[name="filterType"][value="none"]');
+        if (noneFilter) {
+            noneFilter.checked = true;
+        }
         this.selectedStop = null;
     }
 
