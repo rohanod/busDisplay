@@ -15,12 +15,7 @@ RestartSec=10
 StandardOutput=append:__HOME__/busdisplay/webui.log
 StandardError=append:__HOME__/busdisplay/webui.log
 
-# Security settings
-NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=__HOME__/busdisplay __HOME__/.config/busdisplay
 
 [Install]
 WantedBy=multi-user.target

@@ -1,8 +1,9 @@
 #!/bin/bash
 
 rm -f ~/busdisplay/busDisplay.log
+rm -f ~/busdisplay/webui.log
 sudo systemctl restart busdisplay.service
-sleep 10
+sleep 20
 sudo systemctl status busdisplay.service
-tail -f ~/busdisplay/busDisplay.log
-journalctl -fu busdisplay.service
+tail ~/busdisplay/busDisplay.log
+tail ~/busdisplay/webui.log
