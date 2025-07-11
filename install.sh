@@ -45,13 +45,6 @@ echo "Installing web UI dependencies..."
 source venv/bin/activate
 pip install -q -r webui_requirements.txt
 
-# Create log files with proper permissions
-echo "Setting up log files..."
-mkdir -p "${INSTALL_DIR}"
-touch "${INSTALL_DIR}/webui.log"
-chmod 664 "${INSTALL_DIR}/webui.log"
-chown "${USER_NAME}:${USER_NAME}" "${INSTALL_DIR}/webui.log"
-
 # Create config directory and default config file
 echo "Creating configuration directory..."
 mkdir -p "$CONFIG_DIR"
