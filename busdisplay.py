@@ -1,4 +1,4 @@
-import os, sys, logging, datetime, time, json, requests, pygame, io, cairosvg
+import os, sys, logging, datetime, time, json, requests, pygame, io, cairosvg, threading, subprocess, socket
 
 # ────────── Logging ──────────
 LOG_FILE = os.path.expanduser("~/busdisplay/busDisplay.log")
@@ -61,54 +61,59 @@ CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
 
 if not os.path.isfile(CONFIG_PATH):
     log.error(f"Config file not found: {CONFIG_PATH}")
-    log.error("Please create config.json with your configuration")
-    sys.exit(1)
+    log.error("Starting setup mode - will display setup instructions")
+    # Don't exit, continue to setup mode
+    config = {}
+    SETUP_MODE = True
+else:
+    SETUP_MODE = False
 
-with open(CONFIG_PATH) as f:
-    config = json.load(f)
+if not SETUP_MODE:
+    with open(CONFIG_PATH) as f:
+        config = json.load(f)
 
-STOPS = config.get("stops", [])
-if not STOPS:
+STOPS = config.get("stops", []) if not SETUP_MODE else []
+if not STOPS and not SETUP_MODE:
     log.error("No stops configured in config.json")
-    sys.exit(1)
+    SETUP_MODE = True
 
-# Apply all overrides from config
-COLS = config.get("cols", DEFAULT_COLS)
-ROWS = config.get("rows", DEFAULT_ROWS)
-CELL_W_BASE = config.get("cell_w", DEFAULT_CELL_W)
-BAR_H_BASE = config.get("bar_h", DEFAULT_BAR_H)
-BAR_MARGIN_BASE = config.get("bar_margin", DEFAULT_BAR_MARGIN)
-BAR_PADDING_BASE = config.get("bar_padding", DEFAULT_BAR_PADDING)
-CARD_PADDING_BASE = config.get("card_padding", DEFAULT_CARD_PADDING)
-MINUTE_SIZE_BASE = config.get("minute_size", DEFAULT_MINUTE_SIZE)
-NOW_SIZE_BASE = config.get("now_size", DEFAULT_NOW_SIZE)
-STOP_NAME_SIZE_BASE = config.get("stop_name_size", DEFAULT_STOP_NAME_SIZE)
-LINE_SIZE_BASE = config.get("line_size", DEFAULT_LINE_SIZE)
-ICON_SIZE_BASE = config.get("icon_size", DEFAULT_ICON_SIZE)
-ICON_LINE_MULTIPLIER = config.get("icon_line_multiplier", DEFAULT_ICON_LINE_MULTIPLIER)
-BORDER_RADIUS_BASE = config.get("border_radius", DEFAULT_BORDER_RADIUS)
-SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET)
-GRID_SHRINK = config.get("grid_shrink", DEFAULT_GRID_SHRINK)
-WIDGET_SIZE_BASE = config.get("widget_size", DEFAULT_WIDGET_SIZE)
+# Apply all overrides from config (use defaults in setup mode)
+COLS = config.get("cols", DEFAULT_COLS) if not SETUP_MODE else DEFAULT_COLS
+ROWS = config.get("rows", DEFAULT_ROWS) if not SETUP_MODE else DEFAULT_ROWS
+CELL_W_BASE = config.get("cell_w", DEFAULT_CELL_W) if not SETUP_MODE else DEFAULT_CELL_W
+BAR_H_BASE = config.get("bar_h", DEFAULT_BAR_H) if not SETUP_MODE else DEFAULT_BAR_H
+BAR_MARGIN_BASE = config.get("bar_margin", DEFAULT_BAR_MARGIN) if not SETUP_MODE else DEFAULT_BAR_MARGIN
+BAR_PADDING_BASE = config.get("bar_padding", DEFAULT_BAR_PADDING) if not SETUP_MODE else DEFAULT_BAR_PADDING
+CARD_PADDING_BASE = config.get("card_padding", DEFAULT_CARD_PADDING) if not SETUP_MODE else DEFAULT_CARD_PADDING
+MINUTE_SIZE_BASE = config.get("minute_size", DEFAULT_MINUTE_SIZE) if not SETUP_MODE else DEFAULT_MINUTE_SIZE
+NOW_SIZE_BASE = config.get("now_size", DEFAULT_NOW_SIZE) if not SETUP_MODE else DEFAULT_NOW_SIZE
+STOP_NAME_SIZE_BASE = config.get("stop_name_size", DEFAULT_STOP_NAME_SIZE) if not SETUP_MODE else DEFAULT_STOP_NAME_SIZE
+LINE_SIZE_BASE = config.get("line_size", DEFAULT_LINE_SIZE) if not SETUP_MODE else DEFAULT_LINE_SIZE
+ICON_SIZE_BASE = config.get("icon_size", DEFAULT_ICON_SIZE) if not SETUP_MODE else DEFAULT_ICON_SIZE
+ICON_LINE_MULTIPLIER = config.get("icon_line_multiplier", DEFAULT_ICON_LINE_MULTIPLIER) if not SETUP_MODE else DEFAULT_ICON_LINE_MULTIPLIER
+BORDER_RADIUS_BASE = config.get("border_radius", DEFAULT_BORDER_RADIUS) if not SETUP_MODE else DEFAULT_BORDER_RADIUS
+SHADOW_OFFSET_BASE = config.get("shadow_offset", DEFAULT_SHADOW_OFFSET) if not SETUP_MODE else DEFAULT_SHADOW_OFFSET
+GRID_SHRINK = config.get("grid_shrink", DEFAULT_GRID_SHRINK) if not SETUP_MODE else DEFAULT_GRID_SHRINK
+WIDGET_SIZE_BASE = config.get("widget_size", DEFAULT_WIDGET_SIZE) if not SETUP_MODE else DEFAULT_WIDGET_SIZE
 WIDGET_TEXT_SIZE_BASE = DEFAULT_WIDGET_TEXT_SIZE  # Not configurable in config.json
-WIDGET_ICON_SIZE_BASE = config.get("widget_icon_size", DEFAULT_WIDGET_ICON_SIZE)
+WIDGET_ICON_SIZE_BASE = config.get("widget_icon_size", DEFAULT_WIDGET_ICON_SIZE) if not SETUP_MODE else DEFAULT_WIDGET_ICON_SIZE
 CLOCK_TEXT_SIZE_BASE = DEFAULT_CLOCK_TEXT_SIZE    # Fine-tune at top of script
 TEMP_TEXT_SIZE_BASE = DEFAULT_TEMP_TEXT_SIZE      # Fine-tune at top of script  
 WEATHER_TEXT_SIZE_BASE = DEFAULT_WEATHER_TEXT_SIZE # Fine-tune at top of script
 
 # Grid mode settings - use config.json values if available, otherwise defaults
-GRID_WIDGET_WIDTH_BASE = config.get("grid_widget_width", DEFAULT_GRID_WIDGET_WIDTH)
-GRID_WIDGET_HEIGHT_BASE = config.get("grid_widget_height", DEFAULT_GRID_WIDGET_HEIGHT)
-GRID_SCALE_FINAL = config.get("grid_scale", DEFAULT_GRID_SCALE)  # Unified scale for all grid mode elements
+GRID_WIDGET_WIDTH_BASE = config.get("grid_widget_width", DEFAULT_GRID_WIDGET_WIDTH) if not SETUP_MODE else DEFAULT_GRID_WIDGET_WIDTH
+GRID_WIDGET_HEIGHT_BASE = config.get("grid_widget_height", DEFAULT_GRID_WIDGET_HEIGHT) if not SETUP_MODE else DEFAULT_GRID_WIDGET_HEIGHT
+GRID_SCALE_FINAL = config.get("grid_scale", DEFAULT_GRID_SCALE) if not SETUP_MODE else DEFAULT_GRID_SCALE  # Unified scale for all grid mode elements
 
 SCALE_MULTIPLIER = DEFAULT_SCALE_MULTIPLIER
 
-MAX_SHOW       = config.get("max_departures", 8)
-FETCH_INTERVAL = config.get("fetch_interval", DEFAULT_FETCH_INTERVAL)
-MAX_MINUTES    = config.get("max_minutes", 120)
-SHOW_CLOCK     = config.get("show_clock", True)
-SHOW_WEATHER   = config.get("show_weather", True)
-FETCH_TIMEOUT  = config.get("http_timeout", DEFAULT_HTTP_TIMEOUT)
+MAX_SHOW       = config.get("max_departures", 8) if not SETUP_MODE else 8
+FETCH_INTERVAL = config.get("fetch_interval", DEFAULT_FETCH_INTERVAL) if not SETUP_MODE else DEFAULT_FETCH_INTERVAL
+MAX_MINUTES    = config.get("max_minutes", 120) if not SETUP_MODE else 120
+SHOW_CLOCK     = config.get("show_clock", True) if not SETUP_MODE else True
+SHOW_WEATHER   = config.get("show_weather", True) if not SETUP_MODE else True
+FETCH_TIMEOUT  = config.get("http_timeout", DEFAULT_HTTP_TIMEOUT) if not SETUP_MODE else DEFAULT_HTTP_TIMEOUT
 
 # Grid mode options (available in config.json)
 GRID_SCALE_CONFIG = config.get("grid_scale", DEFAULT_GRID_SCALE)
@@ -149,9 +154,92 @@ def _load_svg(path: str, w: int, h: int) -> pygame.Surface:
                            output_width=w, output_height=h)
     return pygame.image.load(io.BytesIO(png)).convert_alpha()
 
-rows       = len(STOPS)
-results    = [None] * rows
+rows       = len(STOPS) if not SETUP_MODE else 0
+results    = [None] * rows if not SETUP_MODE else []
 weather_data = None
+
+def get_network_info():
+    """Get WiFi network name and IP address for setup instructions"""
+    try:
+        # Get WiFi network name (SSID)
+        wifi_name = "Unknown Network"
+        try:
+            result = subprocess.run(['iwgetid', '-r'], capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                wifi_name = result.stdout.strip()
+        except:
+            pass
+        
+        # Get IP address
+        ip_address = "Unknown IP"
+        try:
+            # Get local IP address
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip_address = s.getsockname()[0]
+            s.close()
+        except:
+            pass
+        
+        return wifi_name, ip_address
+    except:
+        return "Unknown Network", "Unknown IP"
+
+def start_webui_background():
+    """Start the web UI in the background"""
+    try:
+        webui_path = os.path.join(os.path.dirname(__file__), "webui.py")
+        if os.path.exists(webui_path):
+            log.info("Starting web UI in background...")
+            subprocess.Popen([sys.executable, webui_path], 
+                           stdout=subprocess.DEVNULL, 
+                           stderr=subprocess.DEVNULL)
+        else:
+            log.warning("Web UI not found at expected path")
+    except Exception as e:
+        log.error(f"Failed to start web UI: {e}")
+
+def draw_setup_screen(screen, info, font_stop, font_minute):
+    """Draw the setup instructions screen"""
+    screen.fill(DARK_BG)
+    
+    wifi_name, ip_address = get_network_info()
+    port = "5000"
+    
+    # Title
+    title_text = "Config not found. Please follow these steps to make config:"
+    title_surf = font_stop.render(title_text, True, ACCENT_COLOR)
+    title_x = (info.current_w - title_surf.get_width()) // 2
+    title_y = int(info.current_h * 0.15)
+    screen.blit(title_surf, (title_x, title_y))
+    
+    # Instructions
+    instructions = [
+        f"1. Connect to the {wifi_name} network if you aren't already connected",
+        f"2. Go to {ip_address}:{port} from a web browser (Laptop is easier but phone works too)",
+        "3. Click the stops tab",
+        "4. Click the \"Add Stop\" button and add a stop", 
+        "5. Click the \"Restart Display\" button",
+        "",
+        "If you want, you can configure more things at the \"Display\" tab"
+    ]
+    
+    y_offset = title_y + title_surf.get_height() + 60
+    line_height = int(font_minute.get_height() * 1.5)
+    
+    for instruction in instructions:
+        if instruction.strip():  # Skip empty lines for spacing
+            instr_surf = font_minute.render(instruction, True, TEXT_PRIMARY)
+            instr_x = (info.current_w - instr_surf.get_width()) // 2
+            screen.blit(instr_surf, (instr_x, y_offset))
+        y_offset += line_height
+    
+    # Footer note
+    footer_text = "The web interface is starting in the background..."
+    footer_surf = font_minute.render(footer_text, True, TEXT_SECONDARY)
+    footer_x = (info.current_w - footer_surf.get_width()) // 2
+    footer_y = int(info.current_h * 0.85)
+    screen.blit(footer_surf, (footer_x, footer_y))
 
 def fetch(stop):
     limit = stop.get("Limit", API_LIMIT)
@@ -627,6 +715,7 @@ def main():
     frame_count = 0
     last_fetch = 0
     loading_start_time = time.time()  # Start loading immediately
+    webui_started = False
     
     while True:
         # Get fresh time each iteration for precise timing
@@ -647,7 +736,14 @@ def main():
             frame = int(current_time) % len(SPINNER)
             
         screen.fill(DARK_BG)
-        if loading:
+        
+        # Handle setup mode
+        if SETUP_MODE:
+            if not webui_started:
+                start_webui_background()
+                webui_started = True
+            draw_setup_screen(screen, info, font_stop, font_minute)
+        elif loading:
             msg  = f"Loading {SPINNER[frame]}"
             surf = font_minute.render(msg, True, ACCENT_COLOR)
             screen.blit(surf, ((info.current_w - surf.get_width())//2,
@@ -801,8 +897,8 @@ def main():
                 draw_bar_at_pos(x, y, *results[idx], screen, COLS, card_w, BAR_PADDING, ICON_SIZE, CARD_PADDING, card_h, SHADOW_OFFSET, BORDER_RADIUS, STOP_NAME_SIZE, clock_img, tram_img, font_stop, font_minute, font_now, font_line)
         pygame.display.flip()
         
-        # Fetch based on interval
-        if current_time >= last_fetch + FETCH_INTERVAL:
+        # Fetch based on interval (skip in setup mode)
+        if not SETUP_MODE and current_time >= last_fetch + FETCH_INTERVAL:
             last_fetch = current_time
             log.info(f"Fetch interval reached, fetching all {len(STOPS)} stops")
             for i, stop in enumerate(STOPS):

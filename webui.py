@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""
+Bus Display Web Configuration UI
+A modern web interface for configuring the bus display application.
+"""
+
+import os
+import sys
+import json
+import subprocess
+import logging
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, send_from_directory
+import requests
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("webui")
+
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
+
+# Configuration paths
+CONFIG_PATH = os.path.expanduser("~/.config/busdisplay/config.json")
+CONFIG_DIR = os.path.dirname(CONFIG_PATH)
+BACKUP_DIR = os.path.join(CONFIG_DIR, "backups")
+
+# Search.ch API for stop search
+SEARCH_API_URL = "https://search.ch/timetable/api/completion.json"
+STATIONBOARD_API_URL = "https://search.ch/timetable/api/stationboard.fr.json"
+
+# Default configuration
+DEFAULT_CONFIG = {
+    "stops": [],
+    "max_departures": 8,
+    "fetch_interval": 60,
+    "max_minutes": 120,
+    "show_clock": True,
+    "show_weather": True,
+    "http_timeout": 10,
+    "cols": 8,
+    "rows": 2,
+    "cell_w": 140,
+    "bar_h": 320,
+    "bar_margin": 30,
+    "bar_padding": 25,
+    "card_padding": 15,
+    "minute_size": 48,
+    "now_size": 30,
+    "stop_name_size": 48,
+    "line_size": 40,
+    "icon_size": 60,
+    "border_radius": 16,
+    "shadow_offset": 6,
+    "grid_shrink": 0.7,
+    "widget_size": 320,
+    "widget_icon_size": 48,
+    "grid_widget_width": 280,
+    "grid_widget_height": 100,
+    "grid_scale": 1.0
+}
+
+def ensure_config_dir():
+    """Ensure configuration directory exists"""
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+
+def load_config():
+    """Load configuration from file"""
+    try:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, 'r') as f:
+                config = json.load(f)
+                # Merge with defaults to ensure all keys exist
+                merged_config = DEFAULT_CONFIG.copy()
+                merged_config.update(config)
+                return merged_config
+        else:
+            return DEFAULT_CONFIG.copy()
+    except Exception as e:
+        log.error(f"Error loading config: {e}")
+        return DEFAULT_CONFIG.copy()
+
+def save_config(config):
+    """Save configuration to file"""
+    try:
+        ensure_config_dir()
+        
+        # Create backup
+        if os.path.exists(CONFIG_PATH):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(BACKUP_DIR, f"config_{timestamp}.json")
+            with open(CONFIG_PATH, 'r') as src, open(backup_path, 'w') as dst:
+                dst.write(src.read())
+        
+        # Save new config
+        with open(CONFIG_PATH, 'w') as f:
+            json.dump(config, f, indent=2)
+        return True
+    except Exception as e:
+        log.error(f"Error saving config: {e}")
+        return False
+
+def get_service_status():
+    """Get busdisplay service status"""
+    try:
+        result = subprocess.run(['systemctl', 'is-active', 'busdisplay'], 
+                              capture_output=True, text=True)
+        return result.stdout.strip()
+    except Exception:
+        return "unknown"
+
+def restart_service():
+    """Restart busdisplay service"""
+    try:
+        result = subprocess.run(['sudo', 'systemctl', 'restart', 'busdisplay'], 
+                              capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+# Routes
+@app.route('/')
+def index():
+    """Main dashboard page"""
+    return render_template('index.html')
+
+@app.route('/api/config')
+def get_config():
+    """Get current configuration"""
+    config = load_config()
+    return jsonify(config)
+
+@app.route('/api/config', methods=['POST'])
+def update_config():
+    """Update configuration"""
+    try:
+        config = request.json
+        if save_config(config):
+            return jsonify({"success": True, "message": "Configuration saved successfully"})
+        else:
+            return jsonify({"success": False, "message": "Failed to save configuration"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+@app.route('/api/status')
+def get_status():
+    """Get system status"""
+    return jsonify({
+        "service_status": get_service_status(),
+        "config_exists": os.path.exists(CONFIG_PATH),
+        "timestamp": datetime.now().isoformat()
+    })
+
+@app.route('/api/restart', methods=['POST'])
+def restart():
+    """Restart the busdisplay service"""
+    if restart_service():
+        return jsonify({"success": True, "message": "Service restarted successfully"})
+    else:
+        return jsonify({"success": False, "message": "Failed to restart service"}), 500
+
+@app.route('/api/search/stops')
+def search_stops():
+    """Search for stops using Search.ch API"""
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify([])
+    
+    try:
+        response = requests.get(SEARCH_API_URL, params={'q': query}, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            stops = []
+            for item in data:
+                if item.get('iconclass') == 'station':
+                    stops.append({
+                        'id': item.get('id'),
+                        'name': item.get('label'),
+                        'type': 'stop'
+                    })
+            return jsonify(stops[:10])  # Limit to 10 results
+        else:
+            return jsonify([])
+    except Exception as e:
+        log.error(f"Stop search error: {e}")
+        return jsonify([])
+
+@app.route('/api/stops/<stop_id>/info')
+def get_stop_info():
+    """Get detailed information about a stop"""
+    stop_id = request.view_args['stop_id']
+    try:
+        response = requests.get(STATIONBOARD_API_URL, params={
+            'stop': stop_id,
+            'limit': 20,
+            'transportation_types': 'bus,tram'
+        }, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            stop_name = data.get('stop', {}).get('name', 'Unknown')
+            
+            # Extract unique lines
+            lines = set()
+            terminals = {}
+            
+            for conn in data.get('connections', []):
+                line = conn.get('*L') or conn.get('line')
+                terminal = conn.get('terminal', {})
+                terminal_id = terminal.get('id')
+                terminal_name = terminal.get('name', 'Unknown')
+                
+                if line:
+                    lines.add(line)
+                    if line not in terminals:
+                        terminals[line] = []
+                    if terminal_id and terminal_name not in [t['name'] for t in terminals[line]]:
+                        terminals[line].append({
+                            'id': terminal_id,
+                            'name': terminal_name
+                        })
+            
+            return jsonify({
+                'id': stop_id,
+                'name': stop_name,
+                'lines': sorted(list(lines)),
+                'terminals': terminals
+            })
+        else:
+            return jsonify({'error': 'Stop not found'}), 404
+    except Exception as e:
+        log.error(f"Stop info error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backups')
+def list_backups():
+    """List available configuration backups"""
+    try:
+        backups = []
+        if os.path.exists(BACKUP_DIR):
+            for filename in sorted(os.listdir(BACKUP_DIR), reverse=True):
+                if filename.startswith('config_') and filename.endswith('.json'):
+                    filepath = os.path.join(BACKUP_DIR, filename)
+                    stat = os.stat(filepath)
+                    backups.append({
+                        'filename': filename,
+                        'timestamp': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        'size': stat.st_size
+                    })
+        return jsonify(backups)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backups/<filename>')
+def download_backup(filename):
+    """Download a configuration backup"""
+    try:
+        return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
+if __name__ == '__main__':
+    ensure_config_dir()
+    print("Starting Bus Display Web UI...")
+    print("Access the interface at: http://localhost:5000")
+    app.run(host='0.0.0.0', port=5000, debug=True)
