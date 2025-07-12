@@ -385,14 +385,19 @@ class BusDisplayUI {
                 } else {
                     resultsElement.innerHTML = stops.map(stop => `
                         <div class="search-result-item" data-stop-id="${stop.id}" data-stop-name="${stop.name}">
-                            <strong>${stop.name}</strong>
-                            <div style="font-size: 0.875rem; color: var(--text-secondary);">ID: ${stop.id}</div>
+                            <div style="font-weight: 500;">${stop.id} (${stop.name})</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">Click to select this stop</div>
                         </div>
                     `).join('');
 
                     // Add click handlers
                     resultsElement.querySelectorAll('.search-result-item').forEach(item => {
-                        item.addEventListener('click', () => this.selectStop(item.dataset.stopId, item.dataset.stopName));
+                        item.addEventListener('click', () => {
+                            // Fill the search box with the ID
+                            document.getElementById('newStopSearch').value = item.dataset.stopId;
+                            resultsElement.classList.remove('show');
+                            this.selectStop(item.dataset.stopId, item.dataset.stopName);
+                        });
                     });
                 }
 
@@ -412,9 +417,6 @@ class BusDisplayUI {
             // Hide search results
             document.getElementById('newStopResults').classList.remove('show');
             
-            // Update search input
-            document.getElementById('newStopSearch').value = stopName;
-            
             // Load stop information
             console.log('Fetching stop info for:', stopId);
             const response = await fetch(`/api/stops/${stopId}/info`);
@@ -427,8 +429,6 @@ class BusDisplayUI {
             console.log('Stop info received:', stopInfo);
             this.selectedStop = stopInfo;
             this.showStopInfo();
-            
-            // Add button is always enabled
             
         } catch (error) {
             console.error('Error selecting stop:', error);
@@ -535,9 +535,24 @@ class BusDisplayUI {
     }
 
     async addStop() {
+        // If no stop is selected but there's text in the search box, try to use it as a stop ID
         if (!this.selectedStop) {
-            this.showToast('Please search and select a stop first', 'warning');
-            return;
+            const stopId = document.getElementById('newStopSearch').value.trim();
+            if (stopId) {
+                try {
+                    await this.selectStop(stopId, stopId);
+                    if (!this.selectedStop) {
+                        this.showToast('Invalid stop ID. Please select from suggestions or enter a valid ID.', 'warning');
+                        return;
+                    }
+                } catch (error) {
+                    this.showToast('Invalid stop ID. Please select from suggestions or enter a valid ID.', 'warning');
+                    return;
+                }
+            } else {
+                this.showToast('Please enter a stop ID or select from suggestions', 'warning');
+                return;
+            }
         }
 
         const filterType = document.querySelector('input[name="filterType"]:checked').value;
