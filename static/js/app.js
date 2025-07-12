@@ -485,8 +485,7 @@ class BusDisplayUI {
         }
 
         container.innerHTML = this.searchResults.map((stop, index) => 
-            '<div class="stop-option" data-stop-id="' + stop.id + '">' +
-                '<input type="radio" name="selectedStop" value="' + stop.id + '" id="stop_' + index + '">' +
+            '<div class="stop-option" data-stop-id="' + stop.id + '" data-stop-index="' + index + '">' +
                 '<div class="stop-option-content">' +
                     '<div class="stop-option-name">' + stop.name + '</div>' +
                     '<div class="stop-option-details">' +
@@ -496,7 +495,7 @@ class BusDisplayUI {
             '</div>'
         ).join('');
 
-        // Add click handlers to the entire stop option div
+        // Custom radio button behavior
         container.querySelectorAll('.stop-option').forEach(option => {
             option.addEventListener('click', () => {
                 // Remove selected class from all options
@@ -507,14 +506,12 @@ class BusDisplayUI {
                 // Add selected class to clicked option
                 option.classList.add('selected');
                 
-                // Select the radio button
-                const radio = option.querySelector('input[type="radio"]');
-                radio.checked = true;
-                
                 // Update selected stop
                 const selectedStopId = option.dataset.stopId;
                 this.selectedStop = this.searchResults.find(stop => stop.id === selectedStopId);
                 document.getElementById('nextStep').disabled = false;
+                
+                console.log('Selected stop:', this.selectedStop);
             });
         });
     }

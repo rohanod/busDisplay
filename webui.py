@@ -9,6 +9,7 @@ import sys
 import json
 import subprocess
 import logging
+import time
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import requests
@@ -42,6 +43,9 @@ BACKUP_DIR = os.path.join(CONFIG_DIR, "backups")
 
 # CSV file for stop search
 ARRETS_CSV_URL = "https://raw.githubusercontent.com/rohanod/arrets/refs/heads/main/arrets.csv"
+CACHE_DIR = os.path.expanduser("~/busdisplay/cache")
+ARRETS_CACHE_FILE = os.path.join(CACHE_DIR, "arrets.csv")
+CACHE_DURATION = 7 * 24 * 3600  # 1 week in seconds
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -174,30 +178,51 @@ def restart():
     else:
         return jsonify({"success": False, "message": "Failed to restart service"}), 500
 
-@app.route('/api/search/stops')
-def search_stops():
-    """Search for stops using arrets.csv"""
-    query = request.args.get('q', '').strip().lower()
-    log.info(f"Stop search request for: '{query}'")
+def ensure_cache_dir():
+    """Ensure cache directory exists"""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+
+def is_cache_valid():
+    """Check if cached CSV file exists and is less than a week old"""
+    if not os.path.exists(ARRETS_CACHE_FILE):
+        return False
     
-    if not query:
-        log.info("Empty query, returning empty results")
-        return jsonify([])
+    file_age = time.time() - os.path.getmtime(ARRETS_CACHE_FILE)
+    return file_age < CACHE_DURATION
+
+def download_csv_file():
+    """Download CSV file and save to cache"""
+    ensure_cache_dir()
+    
+    log.info("Downloading fresh CSV data from GitHub")
+    try:
+        response = requests.get(ARRETS_CSV_URL, timeout=30)
+        if response.status_code == 200:
+            # Save raw CSV to cache file
+            with open(ARRETS_CACHE_FILE, 'w', encoding='utf-8') as f:
+                f.write(response.text)
+            log.info(f"CSV file cached to {ARRETS_CACHE_FILE}")
+            return True
+        else:
+            log.error(f"Failed to download CSV: {response.status_code}")
+            return False
+    except Exception as e:
+        log.error(f"Error downloading CSV: {e}")
+        return False
+
+def load_stops_from_cache():
+    """Load and parse stops data from cached CSV file"""
+    if not os.path.exists(ARRETS_CACHE_FILE):
+        log.warning("No cached CSV file found")
+        return []
     
     try:
-        log.info(f"Searching stops with query: {query}")
-        response = requests.get(ARRETS_CSV_URL, timeout=10)
-        log.info(f"CSV response status: {response.status_code}")
+        import csv
         
-        if response.status_code == 200:
-            import csv
-            import io
+        stops_data = []
+        with open(ARRETS_CACHE_FILE, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f, delimiter=';')
             
-            # Parse CSV data
-            csv_data = response.text
-            reader = csv.DictReader(io.StringIO(csv_data), delimiter=';')
-            
-            stops = []
             for row in reader:
                 stop_name = row.get('Stop', '').strip()
                 stop_code = row.get('Long Code Stop', '').strip()
@@ -206,64 +231,95 @@ def search_stops():
                 country = row.get('Country', '').strip()
                 active = row.get('Actif', '').strip()
                 
-                # Only include active stops
-                if active != 'Y':
-                    continue
-                
-                # Skip stops without Didoc Code (they won't work with Search.ch)
-                if not didoc_code:
-                    continue
-                
-                # Search in stop name, code, and municipality
-                search_text = f"{stop_name} {stop_code} {municipality}".lower()
-                
-                if query in search_text:
-                    stop_data = {
-                        'id': didoc_code,
-                        'name': f"{stop_name} ({municipality}, {country})",
-                        'type': 'stop'
-                    }
-                    stops.append(stop_data)
-                    
-                    # Limit to 10 results for performance
-                    if len(stops) >= 10:
-                        break
-            
-            log.info(f"Found {len(stops)} stops matching query")
-            return jsonify(stops)
-        else:
-            log.warning(f"CSV request returned status {response.status_code}")
+                # Only include active stops with Didoc codes
+                if active == 'Y' and didoc_code:
+                    stops_data.append({
+                        'stop_name': stop_name,
+                        'stop_code': stop_code,
+                        'didoc_code': didoc_code,
+                        'municipality': municipality,
+                        'country': country,
+                        'search_text': f"{stop_name} {stop_code} {municipality}".lower()
+                    })
+        
+        log.info(f"Loaded {len(stops_data)} stops from cache")
+        return stops_data
+        
+    except Exception as e:
+        log.error(f"Error loading cached CSV: {e}")
+        return []
+
+def get_stops_data():
+    """Get stops data, downloading if cache is invalid"""
+    # Check if cache is valid
+    if not is_cache_valid():
+        log.info("Cache is invalid or missing, downloading fresh data")
+        if not download_csv_file():
+            log.warning("Failed to download fresh data, trying to use existing cache")
+    
+    # Load from cache
+    return load_stops_from_cache()
+
+@app.route('/api/search/stops')
+def search_stops():
+    """Search for stops using cached arrets.csv file"""
+    query = request.args.get('q', '').strip().lower()
+    log.info(f"Stop search request for: '{query}'")
+    
+    if not query:
+        log.info("Empty query, returning empty results")
+        return jsonify([])
+    
+    try:
+        # Get stops data from file cache
+        stops_data = get_stops_data()
+        
+        if not stops_data:
+            log.warning("No stops data available")
             return jsonify([])
+        
+        # Search through cached data
+        stops = []
+        for stop_data in stops_data:
+            if query in stop_data['search_text']:
+                result = {
+                    'id': stop_data['didoc_code'],
+                    'name': f"{stop_data['stop_name']} ({stop_data['municipality']}, {stop_data['country']})",
+                    'type': 'stop'
+                }
+                stops.append(result)
+                
+                # Limit to 10 results for performance
+                if len(stops) >= 10:
+                    break
+        
+        log.info(f"Found {len(stops)} stops matching query in {len(stops_data)} total stops")
+        return jsonify(stops)
+        
     except Exception as e:
         log.error(f"Stop search error: {e}")
         return jsonify([])
 
 @app.route('/api/stops/<stop_id>/info')
 def get_stop_info():
-    """Get detailed information about a stop from CSV and Search.ch stationboard"""
+    """Get detailed information about a stop from cached CSV and Search.ch stationboard"""
     stop_id = request.view_args['stop_id']
     log.info(f"Getting stop info for: {stop_id}")
     
     try:
-        # First get stop details from CSV
-        response = requests.get(ARRETS_CSV_URL, timeout=10)
+        # Get stop details from cached CSV
+        stops_data = get_stops_data()
         stop_name = "Unknown"
         municipality = ""
         country = ""
         
-        if response.status_code == 200:
-            import csv
-            import io
-            
-            csv_data = response.text
-            reader = csv.DictReader(io.StringIO(csv_data), delimiter=';')
-            
-            for row in reader:
-                if row.get('Didoc Code', '').strip() == stop_id:
-                    stop_name = row.get('Stop', '').strip()
-                    municipality = row.get('Municipality', '').strip()
-                    country = row.get('Country', '').strip()
-                    break
+        # Find stop in cached data
+        for stop_data in stops_data:
+            if stop_data['didoc_code'] == stop_id:
+                stop_name = stop_data['stop_name']
+                municipality = stop_data['municipality']
+                country = stop_data['country']
+                break
         
         # Then get line information from Search.ch stationboard
         lines = []
