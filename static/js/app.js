@@ -8,6 +8,8 @@ class BusDisplayUI {
         this.config = {};
         this.selectedStop = null;
         this.searchTimeout = null;
+        this.currentWizardStep = 1;
+        this.searchResults = [];
         
         this.init();
     }
@@ -34,8 +36,12 @@ class BusDisplayUI {
         document.getElementById('cancelAddStop').addEventListener('click', () => this.hideAddStopModal());
         document.getElementById('confirmAddStop').addEventListener('click', () => this.addStop());
 
-        // Stop search
-        document.getElementById('newStopSearch').addEventListener('input', (e) => this.searchStops(e.target.value, 'newStopResults'));
+        // Wizard navigation
+        document.getElementById('nextStep').addEventListener('click', () => this.nextWizardStep());
+        document.getElementById('prevStep').addEventListener('click', () => this.prevWizardStep());
+
+        // Stop search in wizard
+        document.getElementById('stopNameSearch').addEventListener('input', (e) => this.handleStopNameSearch(e.target.value));
 
         // Filter type radio buttons
         document.querySelectorAll('input[name="filterType"]').forEach(radio => {
@@ -239,7 +245,6 @@ class BusDisplayUI {
     }
 
     getStopDisplayName(stop) {
-        // If we have cached stop info, use the name from there
         if (stop._cached_name) {
             return stop._cached_name;
         }
@@ -271,7 +276,6 @@ class BusDisplayUI {
     }
 
     updateDisplaySettings() {
-        // Update form fields with current config values
         const fields = [
             'fetchIntervalInput', 'maxDeparturesInput', 'maxMinutesInput', 'httpTimeoutInput',
             'showClockInput', 'showWeatherInput', 'colsInput', 'rowsInput'
@@ -322,12 +326,10 @@ class BusDisplayUI {
     }
 
     switchTab(tabName) {
-        // Update tab buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
 
-        // Update tab content
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === tabName);
         });
@@ -346,7 +348,6 @@ class BusDisplayUI {
 
             if (result.success) {
                 this.showToast('Service restarted successfully', 'success');
-                // Refresh status after a delay
                 setTimeout(() => this.loadStatus().then(() => this.updateStatusIndicator()), 2000);
             } else {
                 throw new Error(result.message);
@@ -359,102 +360,177 @@ class BusDisplayUI {
         }
     }
 
-    async searchStops(query, resultsElementId) {
+    // Wizard functionality
+    showAddStopModal() {
+        this.resetWizard();
+        document.getElementById('addStopModal').classList.add('show');
+        document.getElementById('stopNameSearch').focus();
+    }
+
+    hideAddStopModal() {
+        document.getElementById('addStopModal').classList.remove('show');
+        this.resetWizard();
+    }
+
+    resetWizard() {
+        this.currentWizardStep = 1;
+        this.searchResults = [];
+        this.selectedStop = null;
+        
+        document.getElementById('stopNameSearch').value = '';
+        document.getElementById('stopSelectionList').innerHTML = '';
+        document.getElementById('selectedStopSummary').innerHTML = '';
+        document.getElementById('lineFilterConfig').innerHTML = '';
+        
+        const noneFilter = document.querySelector('input[name="filterType"][value="none"]');
+        if (noneFilter) {
+            noneFilter.checked = true;
+        }
+        
+        this.showWizardStep(1);
+    }
+
+    showWizardStep(step) {
+        document.querySelectorAll('.wizard-step').forEach(stepEl => {
+            stepEl.style.display = 'none';
+        });
+        
+        document.getElementById('step' + step).style.display = 'block';
+        
+        const titles = {
+            1: 'Add New Stop - Step 1 of 3',
+            2: 'Add New Stop - Step 2 of 3', 
+            3: 'Add New Stop - Step 3 of 3'
+        };
+        document.getElementById('modalTitle').textContent = titles[step];
+        
+        const prevBtn = document.getElementById('prevStep');
+        const nextBtn = document.getElementById('nextStep');
+        const confirmBtn = document.getElementById('confirmAddStop');
+        
+        if (step === 1) {
+            prevBtn.style.display = 'none';
+            nextBtn.style.display = 'inline-flex';
+            confirmBtn.style.display = 'none';
+            nextBtn.disabled = this.searchResults.length === 0;
+        } else if (step === 2) {
+            prevBtn.style.display = 'inline-flex';
+            nextBtn.style.display = 'inline-flex';
+            confirmBtn.style.display = 'none';
+            nextBtn.disabled = !this.selectedStop;
+        } else if (step === 3) {
+            prevBtn.style.display = 'inline-flex';
+            nextBtn.style.display = 'none';
+            confirmBtn.style.display = 'inline-flex';
+        }
+        
+        this.currentWizardStep = step;
+    }
+
+    async handleStopNameSearch(query) {
         if (this.searchTimeout) {
             clearTimeout(this.searchTimeout);
         }
 
-        const resultsElement = document.getElementById(resultsElementId);
-        if (!resultsElement) return;
-
-        if (!query.trim()) {
-            resultsElement.classList.remove('show');
-            // Keep add button enabled
+        const nextBtn = document.getElementById('nextStep');
+        
+        if (!query.trim() || query.length < 2) {
+            this.searchResults = [];
+            if (this.currentWizardStep === 1) {
+                nextBtn.disabled = true;
+            }
             return;
         }
 
         this.searchTimeout = setTimeout(async () => {
             try {
-                console.log('Searching for:', query);
-                const response = await fetch(`/api/search/stops?q=${encodeURIComponent(query)}`);
+                const response = await fetch('/api/search/stops?q=' + encodeURIComponent(query));
                 const stops = await response.json();
-                console.log('Search results:', stops);
-
-                if (stops.length === 0) {
-                    resultsElement.innerHTML = '<div class="search-result-item">No stops found</div>';
-                } else {
-                    resultsElement.innerHTML = stops.map(stop => `
-                        <div class="search-result-item" data-stop-id="${stop.id}" data-stop-name="${stop.name}">
-                            <div style="font-weight: 500;">${stop.id} (${stop.name})</div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">Click to select this stop</div>
-                        </div>
-                    `).join('');
-
-                    // Add click handlers
-                    resultsElement.querySelectorAll('.search-result-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            // Fill the search box with the ID
-                            document.getElementById('newStopSearch').value = item.dataset.stopId;
-                            resultsElement.classList.remove('show');
-                            this.selectStop(item.dataset.stopId, item.dataset.stopName);
-                        });
-                    });
+                this.searchResults = stops;
+                if (this.currentWizardStep === 1) {
+                    nextBtn.disabled = stops.length === 0;
                 }
-
-                resultsElement.classList.add('show');
             } catch (error) {
                 console.error('Search error:', error);
-                resultsElement.innerHTML = '<div class="search-result-item">Search failed</div>';
-                resultsElement.classList.add('show');
+                this.searchResults = [];
+                if (this.currentWizardStep === 1) {
+                    nextBtn.disabled = true;
+                }
             }
         }, 300);
     }
 
-    async selectStop(stopId, stopName) {
+    nextWizardStep() {
+        if (this.currentWizardStep === 1) {
+            this.populateStopSelection();
+            this.showWizardStep(2);
+        } else if (this.currentWizardStep === 2) {
+            this.loadSelectedStopInfo();
+            this.showWizardStep(3);
+        }
+    }
+
+    prevWizardStep() {
+        if (this.currentWizardStep > 1) {
+            this.showWizardStep(this.currentWizardStep - 1);
+        }
+    }
+
+    populateStopSelection() {
+        const container = document.getElementById('stopSelectionList');
+        
+        if (this.searchResults.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No stops found</p>';
+            return;
+        }
+
+        container.innerHTML = this.searchResults.map((stop, index) => 
+            '<div class="stop-option">' +
+                '<input type="radio" name="selectedStop" value="' + stop.id + '" id="stop_' + index + '">' +
+                '<div class="stop-option-content">' +
+                    '<div class="stop-option-name">' + stop.name + '</div>' +
+                    '<div class="stop-option-details">' +
+                        'ID: <span class="stop-option-id">' + stop.id + '</span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>'
+        ).join('');
+
+        container.querySelectorAll('input[name="selectedStop"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const selectedStopId = radio.value;
+                this.selectedStop = this.searchResults.find(stop => stop.id === selectedStopId);
+                document.getElementById('nextStep').disabled = false;
+            });
+        });
+    }
+
+    async loadSelectedStopInfo() {
+        if (!this.selectedStop) return;
+
         try {
-            console.log('Selecting stop:', stopId, stopName);
-            
-            // Hide search results
-            document.getElementById('newStopResults').classList.remove('show');
-            
-            // Load stop information
-            console.log('Fetching stop info for:', stopId);
-            const response = await fetch(`/api/stops/${stopId}/info`);
+            const response = await fetch('/api/stops/' + this.selectedStop.id + '/info');
             const stopInfo = await response.json();
 
             if (stopInfo.error) {
                 throw new Error(stopInfo.error);
             }
 
-            console.log('Stop info received:', stopInfo);
             this.selectedStop = stopInfo;
-            this.showStopInfo();
+
+            document.getElementById('selectedStopSummary').innerHTML = 
+                '<h5><i class="fas fa-map-marker-alt"></i> Selected Stop</h5>' +
+                '<div><strong>' + stopInfo.name + '</strong></div>' +
+                '<div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">' +
+                    'ID: ' + stopInfo.id + ' - Available lines: ' + stopInfo.lines.join(', ') +
+                '</div>';
+
+            this.updateFilterConfig();
             
         } catch (error) {
-            console.error('Error selecting stop:', error);
+            console.error('Error loading stop info:', error);
             this.showToast('Failed to load stop information: ' + error.message, 'error');
         }
-    }
-
-    showStopInfo() {
-        const infoElement = document.getElementById('selectedStopInfo');
-        const contentElement = document.getElementById('stopInfoContent');
-        
-        if (!this.selectedStop) return;
-
-        contentElement.innerHTML = `
-            <div style="margin-bottom: 1rem;">
-                <strong>Name:</strong> ${this.selectedStop.name}<br>
-                <strong>ID:</strong> ${this.selectedStop.id}<br>
-                <strong>Available Lines:</strong> ${this.selectedStop.lines.join(', ')}
-            </div>
-        `;
-
-        infoElement.style.display = 'block';
-        
-        // Add button is always enabled
-        
-        this.updateFilterConfig();
     }
 
     updateFilterConfig() {
@@ -472,87 +548,27 @@ class BusDisplayUI {
         }
 
         const lines = this.selectedStop.lines;
-        const terminals = this.selectedStop.terminals;
 
-        configElement.innerHTML = `
-            <div style="margin-top: 1rem;">
-                <label>Select lines to ${filterType}:</label>
-                ${lines.map(line => `
-                    <div style="margin: 0.5rem 0;">
-                        <label class="checkbox-label">
-                            <input type="checkbox" name="selectedLines" value="${line}">
-                            <span>Line ${line}</span>
-                        </label>
-                        ${terminals[line] && terminals[line].length > 1 ? `
-                            <select name="terminal_${line}" style="margin-left: 1.5rem; margin-top: 0.25rem;" disabled>
-                                <option value="">Any destination</option>
-                                ${terminals[line].map(terminal => `
-                                    <option value="${terminal.id}">${terminal.name}</option>
-                                `).join('')}
-                            </select>
-                        ` : ''}
-                    </div>
-                `).join('')}
-            </div>
-        `;
-
-        // Enable/disable terminal selects based on line selection
-        configElement.querySelectorAll('input[name="selectedLines"]').forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                const terminalSelect = configElement.querySelector(`select[name="terminal_${checkbox.value}"]`);
-                if (terminalSelect) {
-                    terminalSelect.disabled = !checkbox.checked;
-                    if (!checkbox.checked) {
-                        terminalSelect.value = '';
-                    }
-                }
-            });
-        });
+        configElement.innerHTML = 
+            '<div style="margin-top: 1rem;">' +
+                '<label>Select lines to ' + filterType + ':</label>' +
+                '<div class="line-selection">' +
+                    lines.map(line => 
+                        '<div class="line-checkbox">' +
+                            '<input type="checkbox" name="selectedLines" value="' + line + '" id="line_' + line + '">' +
+                            '<span class="line-badge-small">' + line + '</span>' +
+                        '</div>'
+                    ).join('') +
+                '</div>' +
+            '</div>';
 
         configElement.style.display = 'block';
     }
 
-    showAddStopModal() {
-        document.getElementById('addStopModal').classList.add('show');
-        document.getElementById('newStopSearch').focus();
-    }
-
-    hideAddStopModal() {
-        document.getElementById('addStopModal').classList.remove('show');
-        this.resetAddStopModal();
-    }
-
-    resetAddStopModal() {
-        document.getElementById('newStopSearch').value = '';
-        document.getElementById('newStopResults').classList.remove('show');
-        document.getElementById('selectedStopInfo').style.display = 'none';
-        // Keep add button enabled
-        const noneFilter = document.querySelector('input[name="filterType"][value="none"]');
-        if (noneFilter) {
-            noneFilter.checked = true;
-        }
-        this.selectedStop = null;
-    }
-
     async addStop() {
-        // If no stop is selected but there's text in the search box, try to use it as a stop ID
         if (!this.selectedStop) {
-            const stopId = document.getElementById('newStopSearch').value.trim();
-            if (stopId) {
-                try {
-                    await this.selectStop(stopId, stopId);
-                    if (!this.selectedStop) {
-                        this.showToast('Invalid stop ID. Please select from suggestions or enter a valid ID.', 'warning');
-                        return;
-                    }
-                } catch (error) {
-                    this.showToast('Invalid stop ID. Please select from suggestions or enter a valid ID.', 'warning');
-                    return;
-                }
-            } else {
-                this.showToast('Please enter a stop ID or select from suggestions', 'warning');
-                return;
-            }
+            this.showToast('Please complete the wizard steps to select a stop', 'warning');
+            return;
         }
 
         const filterType = document.querySelector('input[name="filterType"]:checked').value;
@@ -572,9 +588,7 @@ class BusDisplayUI {
 
             const filterConfig = {};
             selectedLines.forEach(line => {
-                const terminalSelect = document.querySelector(`select[name="terminal_${line}"]`);
-                const terminalId = terminalSelect ? terminalSelect.value : null;
-                filterConfig[line] = terminalId || null;
+                filterConfig[line] = null;
             });
 
             if (filterType === 'include') {
@@ -584,13 +598,11 @@ class BusDisplayUI {
             }
         }
 
-        // Add to config
         if (!this.config.stops) {
             this.config.stops = [];
         }
         this.config.stops.push(newStop);
 
-        // Save and update UI
         if (await this.saveConfig()) {
             this.updateStopsList();
             this.updateDashboard();
@@ -611,8 +623,6 @@ class BusDisplayUI {
     }
 
     editStop(index) {
-        // For now, just show a simple prompt to edit the stop
-        // In a full implementation, you'd want a proper edit modal
         this.showToast('Edit functionality coming soon', 'info');
     }
 
@@ -624,7 +634,6 @@ class BusDisplayUI {
             btn.innerHTML = '<i class="spinner"></i> Saving...';
             btn.disabled = true;
 
-            // Collect form values
             const settings = {
                 fetch_interval: parseInt(document.getElementById('fetchIntervalInput').value),
                 max_departures: parseInt(document.getElementById('maxDeparturesInput').value),
@@ -636,10 +645,8 @@ class BusDisplayUI {
                 rows: parseInt(document.getElementById('rowsInput').value)
             };
 
-            // Update config
             Object.assign(this.config, settings);
 
-            // Save
             if (await this.saveConfig()) {
                 this.updateDashboard();
                 this.showToast('Display settings saved successfully', 'success');
@@ -659,7 +666,7 @@ class BusDisplayUI {
         
         const link = document.createElement('a');
         link.href = url;
-        link.download = `busdisplay_config_${new Date().toISOString().split('T')[0]}.json`;
+        link.download = 'busdisplay_config_' + new Date().toISOString().split('T')[0] + '.json';
         link.click();
         
         URL.revokeObjectURL(url);
@@ -688,7 +695,6 @@ class BusDisplayUI {
         };
         reader.readAsText(file);
         
-        // Reset file input
         event.target.value = '';
     }
 
@@ -699,7 +705,7 @@ class BusDisplayUI {
     showToast(message, type = 'info') {
         const container = document.getElementById('toastContainer');
         const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
+        toast.className = 'toast ' + type;
         
         const icon = {
             success: 'fas fa-check-circle',
@@ -708,23 +714,20 @@ class BusDisplayUI {
             info: 'fas fa-info-circle'
         }[type] || 'fas fa-info-circle';
         
-        toast.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <i class="${icon}"></i>
-                <span>${message}</span>
-            </div>
-        `;
+        toast.innerHTML = 
+            '<div style="display: flex; align-items: center; gap: 0.5rem;">' +
+                '<i class="' + icon + '"></i>' +
+                '<span>' + message + '</span>' +
+            '</div>';
         
         container.appendChild(toast);
         
-        // Auto remove after 5 seconds
         setTimeout(() => {
             if (toast.parentNode) {
                 toast.parentNode.removeChild(toast);
             }
         }, 5000);
         
-        // Click to dismiss
         toast.addEventListener('click', () => {
             if (toast.parentNode) {
                 toast.parentNode.removeChild(toast);
@@ -733,7 +736,6 @@ class BusDisplayUI {
     }
 
     startStatusPolling() {
-        // Poll status every 30 seconds
         setInterval(async () => {
             await this.loadStatus();
             this.updateStatusIndicator();

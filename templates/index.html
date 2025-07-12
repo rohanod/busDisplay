@@ -283,44 +283,81 @@
     <div class="modal" id="addStopModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Add New Stop</h3>
+                <h3 id="modalTitle">Add New Stop - Step 1 of 3</h3>
                 <button class="modal-close" id="closeAddStopModal">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label for="newStopSearch">Enter Stop ID</label>
-                    <input type="text" id="newStopSearch" placeholder="Type stop name to see suggestions, then select the ID...">
-                    <small>Start typing a stop name to see suggestions with IDs. Click a suggestion to select it.</small>
-                    <div class="search-results" id="newStopResults"></div>
-                </div>
-                <div id="selectedStopInfo" style="display: none;">
-                    <h4>Stop Information</h4>
-                    <div id="stopInfoContent"></div>
+                <!-- Step 1: Search for stop -->
+                <div class="wizard-step" id="step1" style="display: block;">
+                    <div class="step-header">
+                        <h4><i class="fas fa-search"></i> Search for Stop</h4>
+                        <p>Enter the name of the stop you want to add</p>
+                    </div>
                     <div class="form-group">
-                        <label>Line Filtering (Optional)</label>
+                        <label for="stopNameSearch">Stop Name</label>
+                        <input type="text" id="stopNameSearch" placeholder="Enter stop name (e.g., Bouchet, Gare, Centre)...">
+                        <small>Type at least 2 characters to search</small>
+                    </div>
+                </div>
+
+                <!-- Step 2: Select specific stop -->
+                <div class="wizard-step" id="step2" style="display: none;">
+                    <div class="step-header">
+                        <h4><i class="fas fa-map-marker-alt"></i> Select Stop</h4>
+                        <p>Choose the exact stop from the search results</p>
+                    </div>
+                    <div id="stopSelectionList" class="stop-selection-list">
+                        <!-- Radio buttons will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Step 3: Configure line filters -->
+                <div class="wizard-step" id="step3" style="display: none;">
+                    <div class="step-header">
+                        <h4><i class="fas fa-filter"></i> Line Filtering</h4>
+                        <p>Choose which bus/tram lines to show for this stop</p>
+                    </div>
+                    <div id="selectedStopSummary" class="selected-stop-summary">
+                        <!-- Selected stop info will be shown here -->
+                    </div>
+                    <div class="form-group">
+                        <label>Filter Options</label>
                         <div class="filter-options">
                             <label class="radio-label">
                                 <input type="radio" name="filterType" value="none" checked>
                                 <span>Show all lines</span>
+                                <small>Display all available bus/tram lines for this stop</small>
                             </label>
                             <label class="radio-label">
                                 <input type="radio" name="filterType" value="include">
                                 <span>Include only specific lines</span>
+                                <small>Only show selected lines</small>
                             </label>
                             <label class="radio-label">
                                 <input type="radio" name="filterType" value="exclude">
                                 <span>Exclude specific lines</span>
+                                <small>Hide selected lines, show all others</small>
                             </label>
                         </div>
-                        <div id="lineFilterConfig" style="display: none;"></div>
+                        <div id="lineFilterConfig" style="display: none;">
+                            <!-- Line selection will be populated here -->
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelAddStop">Cancel</button>
-                <button class="btn btn-primary" id="confirmAddStop">Add Stop</button>
+                <button class="btn btn-secondary" id="prevStep" style="display: none;">
+                    <i class="fas fa-arrow-left"></i> Previous
+                </button>
+                <button class="btn btn-primary" id="nextStep">
+                    Next <i class="fas fa-arrow-right"></i>
+                </button>
+                <button class="btn btn-primary" id="confirmAddStop" style="display: none;">
+                    <i class="fas fa-plus"></i> Add Stop
+                </button>
             </div>
         </div>
     </div>
