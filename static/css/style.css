@@ -791,6 +791,7 @@ body {
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: var(--transition-normal);
+    position: relative;
 }
 
 .stop-option:hover {
@@ -798,9 +799,18 @@ body {
     border-color: var(--accent-orange);
 }
 
+.stop-option.selected {
+    background: rgba(255, 140, 0, 0.1);
+    border-color: var(--accent-orange);
+}
+
 .stop-option input[type="radio"] {
-    margin-right: var(--spacing-md);
-    margin-top: 2px;
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
 }
 
 .stop-option-content {
