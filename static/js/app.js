@@ -369,11 +369,7 @@ class BusDisplayUI {
 
         if (!query.trim()) {
             resultsElement.classList.remove('show');
-            // Reset the add button when search is cleared
-            const addButton = document.getElementById('confirmAddStop');
-            if (addButton) {
-                addButton.disabled = true;
-            }
+            // Keep add button enabled
             return;
         }
 
@@ -432,14 +428,7 @@ class BusDisplayUI {
             this.selectedStop = stopInfo;
             this.showStopInfo();
             
-            // Explicitly enable the add button
-            const addButton = document.getElementById('confirmAddStop');
-            if (addButton) {
-                addButton.disabled = false;
-                console.log('Add button enabled');
-            } else {
-                console.error('Add button not found');
-            }
+            // Add button is always enabled
             
         } catch (error) {
             console.error('Error selecting stop:', error);
@@ -463,11 +452,7 @@ class BusDisplayUI {
 
         infoElement.style.display = 'block';
         
-        // Enable the add button
-        const addButton = document.getElementById('confirmAddStop');
-        if (addButton) {
-            addButton.disabled = false;
-        }
+        // Add button is always enabled
         
         this.updateFilterConfig();
     }
@@ -541,10 +526,7 @@ class BusDisplayUI {
         document.getElementById('newStopSearch').value = '';
         document.getElementById('newStopResults').classList.remove('show');
         document.getElementById('selectedStopInfo').style.display = 'none';
-        const addButton = document.getElementById('confirmAddStop');
-        if (addButton) {
-            addButton.disabled = true;
-        }
+        // Keep add button enabled
         const noneFilter = document.querySelector('input[name="filterType"][value="none"]');
         if (noneFilter) {
             noneFilter.checked = true;
@@ -553,7 +535,10 @@ class BusDisplayUI {
     }
 
     async addStop() {
-        if (!this.selectedStop) return;
+        if (!this.selectedStop) {
+            this.showToast('Please search and select a stop first', 'warning');
+            return;
+        }
 
         const filterType = document.querySelector('input[name="filterType"]:checked').value;
         const newStop = {
