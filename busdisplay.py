@@ -738,16 +738,17 @@ def main():
 
     
     # Initialize fonts and images after scaling is calculated
-    font_minute = pygame.font.SysFont("DejaVuSans", MINUTE_SIZE, bold=True)
-    font_now  = pygame.font.SysFont("DejaVuSans", NOW_SIZE, bold=True)
-    font_stop = pygame.font.SysFont("DejaVuSans", STOP_NAME_SIZE, bold=True)
-    font_line = pygame.font.SysFont("DejaVuSans", LINE_SIZE, bold=True)
-    font_clock = pygame.font.SysFont("DejaVuSans", int(STOP_NAME_SIZE * 0.8), bold=True)
-    font_digital = pygame.font.SysFont("Courier", int(STOP_NAME_SIZE * 0.6), bold=True)  # Digital clock font
-    font_widget = pygame.font.SysFont("DejaVuSans", WIDGET_TEXT_SIZE, bold=True)
-    font_clock_widget = pygame.font.SysFont("Courier", CLOCK_TEXT_SIZE, bold=True)
-    font_temp = pygame.font.SysFont("DejaVuSans", TEMP_TEXT_SIZE, bold=True)
-    font_weather_text = pygame.font.SysFont("DejaVuSans", WEATHER_TEXT_SIZE, bold=True)
+    # Use pygame.font.Font(None, size) to avoid fc-list timeout issues
+    font_minute = pygame.font.Font(None, MINUTE_SIZE)
+    font_now  = pygame.font.Font(None, NOW_SIZE)
+    font_stop = pygame.font.Font(None, STOP_NAME_SIZE)
+    font_line = pygame.font.Font(None, LINE_SIZE)
+    font_clock = pygame.font.Font(None, int(STOP_NAME_SIZE * 0.8))
+    font_digital = pygame.font.Font(None, int(STOP_NAME_SIZE * 0.6))  # Digital clock font
+    font_widget = pygame.font.Font(None, WIDGET_TEXT_SIZE)
+    font_clock_widget = pygame.font.Font(None, CLOCK_TEXT_SIZE)
+    font_temp = pygame.font.Font(None, TEMP_TEXT_SIZE)
+    font_weather_text = pygame.font.Font(None, WEATHER_TEXT_SIZE)
     
     # Fixed card dimensions
     global FIXED_CARD_W
